@@ -1,0 +1,74 @@
+# AGENTS.md — spreadsheet-ai (Tabular Review demo)
+
+Operating instructions for any AI agent (Claude / Copilot / sub-agents) working
+in this repository. Read this fully before acting. Then read, in order:
+`docs/plan.md`, `docs/PROGRESS.md`, `docs/LESSON.md`, `docs/RULES.md`.
+
+## Project identity
+A functioning single-page demo of an **agentic spreadsheet** ("Tabular Review"):
+rows = e-commerce entities, columns = LLM prompts, cells = AI values with
+confidence flag + citation. Laravel 13 + React/Vite/Tailwind + Glide Data Grid,
+LLM via the `laravel/ai` SDK. See `docs/plan.md` §0 for the full brief and the
+three locked architecture decisions (SQLite · synchronous SSE no-Redis · Mock
+default + Live toggle).
+
+## Required context files (every session, every sub-agent)
+- `docs/plan.md` — canonical plan + deep analysis + task breakdown.
+- `docs/PROGRESS.md` — live "where am I" log. Update after meaningful work.
+- `docs/LESSON.md` — non-obvious facts / fixes. Update whenever you learn one (including from Copilot feedback).
+- `docs/RULES.md` — binding implementation/security/testing/review rules.
+
+## Reference sources (do not re-derive — read them)
+- Article: `%USERPROFILE%\Downloads\medium\SpreadsheetAi\article-bozza-italiano.md`
+- Design prototype (pixel reference): `%USERPROFILE%\Downloads\SpreadsheetAi\tabular-review-demo\project\`
+- Backend patterns to copy: `%USERPROFILE%\Documents\DocLore\Visual Basic\Ai\AskMyDocs` (`app/Support/TabularReview/FormatType.php`, `app/Services/TabularReview/TabularReviewExtractor.php`, `app/Ai/AiManager.php`).
+- Governance template: `%USERPROFILE%\Documents\DocLore\Visual Basic\Ai\product_image_discovery_admin`.
+
+## Branch & PR loop (mandatory)
+- One **branch per macro task** (`task/m1-foundation`, `task/m2-engine`, …). Subtasks branch off and PR **into the macro branch**; finished macro branch PRs **into `main`**.
+- **A (sub)task is DONE only when, in this order:**
+  0. **Define objective + guardrails as tests** before writing implementation code (TDD).
+  1. **Local tests loop** — all green: `phpunit`, `vitest`, `vite build`, and — for any UI/UX work — **Playwright scenarios covering every interaction**. Fix until green.
+  2. **Local Copilot review loop** (BEFORE any push) — run the local Copilot CLI against the *complete* branch diff vs `origin/main`, fix everything it flags, re-run, loop until clean. See the exact command below.
+  3. Push the branch; open PR toward the working branch.
+  4. **GitHub Copilot** requested as reviewer and its review confirmed started.
+  5. **GitHub CI + Copilot loop (MANDATORY — never merge early)** — after pushing, the **GitHub Actions CI** (`.github/workflows/ci.yml`: phpunit + vitest + typecheck + build + Playwright) MUST run and go **green**, AND the **GitHub Copilot review MUST actually post** and have **zero unresolved comments**. Poll/wait as long as needed (minutes); do NOT merge while CI is pending/red or while Copilot has not reviewed or has open comments. If CI fails or Copilot leaves comments → fix, push, re-request Copilot review, and loop. Re-request Copilot via the REST endpoint (step 4) and verify it shows in `reviewRequests`.
+  6. Merge ONLY when **CI is green AND Copilot has reviewed with zero open comments**. Then record findings in `docs/LESSON.md`; update `docs/PROGRESS.md`. Only then move to the next task.
+- Pure-code tasks: PHPUnit/Vitest suffice. UI/UX tasks: Playwright is required too.
+
+### Local Copilot review (step 2 — before push)
+Write the **full branch diff vs `origin/main`** to a gitignored file (inline `$(git diff …)` overflows the OS arg limit on large diffs — see `docs/LESSON.md`), then tell the Copilot CLI to read it and invoke the **`/review`** skill (give it the complete diff, not just open/changed files):
+
+```bash
+git diff origin/main...HEAD > .review-diff.patch
+copilot --autopilot --yolo -p "Read .review-diff.patch (the COMPLETE diff of this branch vs origin/main). /review it for regressions, bugs, bad practices, security issues, and improvements; apply safe fixes and report the rest. Keep the test gates green."
+```
+
+Fix every legitimate finding, re-run the local tests, re-run this local review, and loop until clean. Only then push. Record non-obvious findings in `docs/LESSON.md`. (`.review-diff.patch` is gitignored.)
+
+### Requesting GitHub Copilot review (step 4)
+**Working method (verified PR #1):** the REST endpoint —
+```bash
+gh api --method POST repos/<owner>/<repo>/pulls/<PR>/requested_reviewers \
+  -f 'reviewers[]=copilot-pull-request-reviewer[bot]'
+```
+Then verify: `gh pr view <PR> --json reviewRequests` must list the `Copilot` bot.
+`gh pr edit <PR> --add-reviewer @copilot` returns exit 0 but is a **silent no-op**
+(does NOT actually request Copilot) — do not trust it. Do NOT substitute
+`@codex review` unless the user explicitly asks.
+
+## Sub-agent strategy
+- Spawn sub-agents for disjoint write scopes (backend vs frontend). Hand each one `docs/LESSON.md` + `docs/plan.md` + `docs/RULES.md` + this file in its prompt.
+- Keep one integrator agent responsible for the final gates and the merge.
+- Worker write scopes must not overlap.
+
+## Environment (Windows / Herd)
+- Use **Herd PHP** (`%USERPROFILE%\.config\herd\bin\php84\php.exe`), not XAMPP. Set `PHP_BINARY` if `php` is not on PATH. (Herd PHP 8.4 satisfies the `^8.4` composer constraint.)
+- Run the PHPUnit gate through an `npm run phpunit` wrapper (`scripts/run-php.mjs`) to avoid stale PATH / XAMPP resolution.
+- Vitest in CI: `pool: 'threads'`, `LARAVEL_BYPASS_ENV_CHECK=1`. Validate lockfiles with `npx npm@10 ci --dry-run`.
+- If a gate is blocked by sandbox/network, record the exact blocker in `docs/PROGRESS.md` — do not silently skip.
+- **Skill directory**: the resume skill lives at `.claude/skills/spreadsheet-ai-plan/SKILL.md`. If `.claude/skills/` is sandbox-blocked, fall back to a repo-local `skills/` directory.
+
+## Final task
+After all macro tasks, fold `docs/LESSON.md` learnings back into `docs/RULES.md`,
+the skills, this file, and `CLAUDE.md`, then tag `v0.1.0` and cut the GitHub release.
