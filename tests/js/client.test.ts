@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+    ApiError,
     addColumn,
+    apiFetch,
     deleteColumn,
     getReview,
     getSuggestions,
@@ -101,5 +103,42 @@ describe('api client CSRF + headers', () => {
     it('throws ApiError on non-2xx', async () => {
         mockFetch({ message: 'boom' }, 422);
         await expect(getReview('returns')).rejects.toThrow('boom');
+    });
+
+    it('handles non-JSON 500 error body cleanly with ApiError', async () => {
+        vi.stubGlobal(
+            'fetch',
+            vi.fn(
+                async () =>
+                    new Response('<html>Internal Server Error</html>', {
+                        status: 500,
+                        statusText: 'Internal Server Error',
+                        headers: { 'Content-Type': 'text/html' },
+                    }),
+            ),
+        );
+        await expect(apiFetch('/api/reviews/returns')).rejects.toMatchObject({
+            name: 'ApiError',
+            status: 500,
+            message: 'Internal Server Error',
+        });
+        await expect(apiFetch('/api/reviews/returns')).rejects.toBeInstanceOf(ApiError);
+    });
+
+    it('returns undefined on 204 No Content', async () => {
+        vi.stubGlobal(
+            'fetch',
+            vi.fn(async () => new Response(null, { status: 204 })),
+        );
+        await expect(apiFetch('/api/reviews/1/noop')).resolves.toBeUndefined();
+    });
+
+    it('rejects cross-origin or non-absolute paths', async () => {
+        const fetchSpy = vi.fn();
+        vi.stubGlobal('fetch', fetchSpy);
+        await expect(apiFetch('https://evil.example/api')).rejects.toThrow(
+            /same-origin absolute paths/i,
+        );
+        expect(fetchSpy).not.toHaveBeenCalled();
     });
 });

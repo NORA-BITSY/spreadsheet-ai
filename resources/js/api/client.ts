@@ -52,6 +52,12 @@ export interface Cell {
     status: string;
 }
 
+export interface AiMode {
+    mock: boolean;
+    provider: string;
+    model: string;
+}
+
 export interface ReviewResponse {
     review: Review;
     base_columns: BaseColumn[];
@@ -59,6 +65,7 @@ export interface ReviewResponse {
     rows: Row[];
     cells: Cell[];
     suggestions_available: boolean;
+    ai_mode?: AiMode;
 }
 
 export interface Suggestion {

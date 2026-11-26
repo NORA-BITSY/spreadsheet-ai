@@ -41,6 +41,7 @@ cell‑by‑cell.
 - [Quickstart (junior‑proof, step by step)](#quickstart-juniorproof-step-by-step)
 - [Going Live (real LLM)](#going-live-real-llm)
 - [Demo data & presets](#demo-data--presets)
+- [Production Considerations & API Reference](#production-considerations--api-reference)
 - [Testing & CI](#testing--ci)
 - [Credits — MikeOSS](#credits--mikeoss)
 - [License](#license)
@@ -79,7 +80,7 @@ is that idea, **generalized beyond legal** and built on a stack anyone can adopt
 - **🖼️ Canvas grid (Glide Data Grid)** — smooth to 100k+ rows, where a DOM grid plateaus at ~500.
 - **✨ AI Suggest** proposes columns tailored to the active scenario.
 - **🔎 Citation side‑panel, bulk regenerate, human‑readable confidence dots.**
-- **🟢 Runs out‑of‑the‑box in Mock mode** — zero API keys, fully deterministic — then flip a switch for real LLM calls via the **`laravel/ai`** SDK.
+- **🟢 Runs out‑of‑the‑box in Mock mode** — zero API keys, fully deterministic — then switch to real LLM calls via `TABULAR_AI_MOCK=false` in `.env` using the **`laravel/ai`** SDK.
 
 ## Screenshots
 
@@ -101,7 +102,7 @@ Three deliberate decisions keep this a clonable, zero‑setup demo:
 
 1. **SQLite** (`database/database.sqlite`) — rows are seeded e‑commerce entities; no embeddings/pgvector needed (the LLM context is the row itself).
 2. **Synchronous SSE** — the stream endpoint iterates rows, calls the extractor, and echoes `cell` events as they land. No Redis/Horizon.
-3. **Mock mode by default + a Live toggle** — works offline; flip to real `laravel/ai` (Anthropic `claude-haiku-4-5`) when you add a key.
+3. **Mock mode by default (server‑controlled via `.env`)** — works offline; switch to real `laravel/ai` (Anthropic `claude-haiku-4-5`) by setting `TABULAR_AI_MOCK=false` and an API key. The active mode is shown as a read‑only badge in the toolbar.
 
 **Stack:** Laravel 13 · PHP 8.4+ · `laravel/ai` · SQLite — and React 19 · Vite 8 ·
 Tailwind v4 · `@glideapps/glide-data-grid` · TanStack Query.
@@ -165,7 +166,10 @@ It all works in **Mock mode** with **no API key**.
 
 ## Going Live (real LLM)
 
-Mock mode is the default. To use real model calls via `laravel/ai`:
+> [!WARNING]
+> **No authentication is built into the demo API.** Spreadsheet‑AI is designed for local or trusted internal environments. Before exposing Live mode publicly, add authentication and access control, review the rate limits (`TABULAR_RATE_LIMIT_API`, `TABULAR_RATE_LIMIT_STREAM`), and configure spend caps with your LLM provider.
+
+Mock vs Live mode is **server‑controlled** via `TABULAR_AI_MOCK` in `.env` (and reflected by a read‑only mode badge in the toolbar — the toolbar does not toggle backend execution). Mock mode is the default (`TABULAR_AI_MOCK=true`). To enable real model calls via `laravel/ai`:
 
 ```dotenv
 # .env
@@ -173,9 +177,18 @@ TABULAR_AI_MOCK=false
 TABULAR_AI_PROVIDER=anthropic
 TABULAR_AI_MODEL=claude-haiku-4-5
 ANTHROPIC_API_KEY=sk-ant-...
+
+# Optional tuning & throttling (defaults shown)
+TABULAR_SSE_PACING_MS=120
+TABULAR_RATE_LIMIT_API=120
+TABULAR_RATE_LIMIT_STREAM=30
 ```
 
-The extractor then issues **one batched call per row** (JSON‑lines, one object per
+- `TABULAR_SSE_PACING_MS` — per‑cell delay in milliseconds during Mock streaming (`120` default; `20` in E2E tests).
+- `TABULAR_RATE_LIMIT_API` — per‑minute rate limit for standard `/api/*` endpoints (`120` default).
+- `TABULAR_RATE_LIMIT_STREAM` — per‑minute rate limit for the `/api/reviews/{id}/stream` SSE endpoint (`30` default).
+
+The extractor issues **one batched call per row** (JSON‑lines, one object per
 column); `json_path` columns never call the model.
 
 ## Demo data & presets
@@ -185,11 +198,33 @@ articles, orders, order items, returns, email campaigns) plus 5 built‑in
 workflows — the exact rows behind the cooked Mock answers, so the demo looks
 identical with or without a key. Seeders are gated to `local`/`testing`.
 
+## Production Considerations & API Reference
+
+### Synchronous SSE & reverse proxies
+The stream endpoint executes synchronously inside the HTTP request lifecycle — each active SSE stream holds a PHP worker open until all rows complete or the client disconnects.
+- **Nginx / reverse proxies**: disable response buffering (`X-Accel-Buffering: no`, already sent by the controller) and raise `proxy_read_timeout` (and PHP `max_execution_time` / FPM `request_terminate_timeout`) to cover long live runs.
+- **When to move to queues/Redis**: for multi‑user traffic, large tables (hundreds+ of rows), or slow providers, offload extraction to Laravel Queues + Horizon and broadcast cell events via Redis pub/sub or Laravel Reverb instead of holding synchronous HTTP workers.
+
+### Database (SQLite vs PostgreSQL / MySQL)
+- **Single‑node / low concurrency**: SQLite is configured in WAL mode with `busy_timeout=5000`, which handles local use and light single‑node deployments cleanly.
+- **Multi‑worker / horizontal production**: switch `DB_CONNECTION` to PostgreSQL or MySQL to avoid write‑lock contention under concurrent cell upserts across multiple workers or instances.
+
+### API Reference (`/api/*`)
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| `GET` | `/api/reviews/{preset}` | Hydrate a review (rows, base/AI columns, existing cells, suggestion count) for a preset key. |
+| `POST` | `/api/reviews/{id}/columns` | Append a new AI or `json_path` column to a review and return the updated review payload. |
+| `PATCH` | `/api/reviews/{id}/columns/{index}` | Update a column's label, format, prompt, `enum_values`, or `json_path`. |
+| `DELETE` | `/api/reviews/{id}/columns/{index}` | Remove a column and its persisted cells from a review. |
+| `GET` | `/api/suggest/{preset}` | Return tailored AI column proposals for the active preset. |
+| `GET` | `/api/reviews/{id}/stream` | Synchronous `text/event-stream` SSE endpoint (`?cols=&force=`) streaming `cell` events and a terminal `done` event. |
+
 ## Testing & CI
 
 ```bash
 composer validate --strict
-vendor/bin/phpunit      # backend (PHPUnit)
+vendor/bin/phpunit      # backend (PHPUnit) — or `npm run phpunit` (cross-platform / Windows Herd PHP wrapper)
 npm run typecheck       # TypeScript
 npm run test            # frontend units (Vitest)
 npm run build           # Vite build

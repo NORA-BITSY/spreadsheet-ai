@@ -16,9 +16,11 @@ import {
     citationCount,
     deterministicHue,
     detectJsonPathType,
+    formatRating,
     isSafeUrl,
     normaliseFlag,
     parsePercent,
+    parseRating,
     percentSign,
     truncate,
     urlHost,
@@ -137,10 +139,26 @@ function drawText(d: DrawCtx, value: unknown): void {
 
 function drawBulletList(d: DrawCtx, value: unknown): void {
     const { ctx, theme, rect } = d;
-    const items = Array.isArray(value) ? value.map(String) : [String(value ?? '')];
+    let items: string[];
+    if (Array.isArray(value)) {
+        items = value.map((item) => valueToText(item)).filter((s) => s.length > 0);
+    } else if (typeof value === 'string') {
+        items = value
+            .split(/\r?\n/)
+            .map((line) => line.replace(/^\s*[•\-*]\s*/, '').trim())
+            .filter((s) => s.length > 0);
+    } else {
+        const text = valueToText(value);
+        items = text ? [text] : [];
+    }
     setFont(ctx, theme);
-    ctx.fillStyle = d.textColor;
     ctx.textBaseline = 'middle';
+    if (items.length === 0) {
+        ctx.fillStyle = d.mutedColor;
+        ctx.fillText('—', rect.x + PAD, d.cy);
+        return;
+    }
+    ctx.fillStyle = d.textColor;
     const max = Math.floor((d.rightLimit - rect.x - PAD) / 6.0);
     const joined = items.map((t) => `• ${t}`).join('   ');
     ctx.fillText(truncate(joined, Math.max(6, max)), rect.x + PAD, d.cy);
@@ -216,7 +234,8 @@ function drawDate(d: DrawCtx, value: unknown): void {
     ctx.font = `13px ${MONO}`;
     ctx.fillStyle = d.textColor;
     ctx.textBaseline = 'middle';
-    ctx.fillText(valueToText(value), rect.x + PAD, d.cy);
+    const max = Math.floor((d.rightLimit - rect.x - PAD) / 7.2);
+    ctx.fillText(truncate(valueToText(value), Math.max(4, max)), rect.x + PAD, d.cy);
 }
 
 function drawHuedPill(d: DrawCtx, value: unknown): void {
@@ -232,9 +251,15 @@ function drawEnumStatus(d: DrawCtx, value: unknown): void {
 }
 
 function drawRating(d: DrawCtx, value: unknown): void {
-    const { ctx, rect } = d;
-    const parsed = parsePercent(value);
-    const n = Math.max(0, Math.min(5, parsed == null ? 0 : Math.round(parsed)));
+    const { ctx, theme, rect } = d;
+    const n = parseRating(value);
+    if (n == null) {
+        setFont(ctx, theme);
+        ctx.fillStyle = d.mutedColor;
+        ctx.textBaseline = 'middle';
+        ctx.fillText('—', rect.x + PAD, d.cy);
+        return;
+    }
     const color = n >= 4 ? FLAG_DOT.red : n === 3 ? FLAG_DOT.yellow : d.textColor;
     ctx.fillStyle = color;
     ctx.font = '12px ui-sans-serif, sans-serif';
@@ -276,10 +301,34 @@ function drawUrl(d: DrawCtx, value: unknown): void {
     }
 }
 
+function initialsFromName(name: string): string {
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return '?';
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+}
+
 function drawPerson(d: DrawCtx, value: unknown): void {
     const { ctx, theme, rect } = d;
-    const p = (value ?? {}) as { name?: string; initials?: string; hue?: number };
-    const hue = typeof p.hue === 'number' ? p.hue : deterministicHue(p.name ?? '');
+    let name: string;
+    let initials: string;
+    let hue: number;
+    if (typeof value === 'string') {
+        name = value.trim();
+        initials = initialsFromName(name);
+        hue = deterministicHue(name);
+    } else {
+        const p = (value != null && typeof value === 'object' ? value : {}) as {
+            name?: unknown;
+            initials?: unknown;
+            hue?: unknown;
+        };
+        name = typeof p.name === 'string' ? p.name : valueToText(value);
+        initials = typeof p.initials === 'string' && p.initials.trim() !== ''
+            ? p.initials.trim()
+            : initialsFromName(name);
+        hue = typeof p.hue === 'number' && Number.isFinite(p.hue) ? p.hue : deterministicHue(name);
+    }
     const r = 9;
     const ax = rect.x + PAD + r;
     ctx.fillStyle = `oklch(0.55 0.15 ${hue})`;
@@ -290,18 +339,29 @@ function drawPerson(d: DrawCtx, value: unknown): void {
     ctx.font = `bold 9px ui-sans-serif, sans-serif`;
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'center';
-    ctx.fillText(p.initials ?? '?', ax, d.cy);
+    ctx.fillText(initials, ax, d.cy);
     ctx.textAlign = 'left';
     setFont(ctx, theme);
     ctx.fillStyle = d.textColor;
     const tx = ax + r + 6;
     const max = Math.floor((d.rightLimit - tx) / 6.4);
-    ctx.fillText(truncate(p.name ?? '', Math.max(4, max)), tx, d.cy);
+    ctx.fillText(truncate(name, Math.max(4, max)), tx, d.cy);
 }
 
 function drawTagsMulti(d: DrawCtx, value: unknown): void {
     const { ctx, theme, rect } = d;
-    const tags = Array.isArray(value) ? value.map(String) : [];
+    let tags: string[];
+    if (Array.isArray(value)) {
+        tags = value.map((item) => valueToText(item)).filter((s) => s.length > 0);
+    } else if (typeof value === 'string') {
+        tags = value
+            .split(',')
+            .map((s) => s.trim())
+            .filter((s) => s.length > 0);
+    } else {
+        const text = valueToText(value);
+        tags = text ? [text] : [];
+    }
     if (tags.length === 0) {
         ctx.fillStyle = d.mutedColor;
         setFont(ctx, theme);
@@ -344,14 +404,28 @@ function drawTagsMulti(d: DrawCtx, value: unknown): void {
 
 function drawRelation(d: DrawCtx, value: unknown): void {
     const { ctx, theme, rect } = d;
-    const v = (value ?? {}) as { kind?: string; label?: string };
+    let kind = '';
+    let label = '';
+    if (typeof value === 'string') {
+        label = value;
+        const prefix = value.split(':')[0]?.toLowerCase() ?? '';
+        if (prefix in REL_ICON) kind = prefix;
+    } else if (value != null && typeof value === 'object') {
+        const v = value as { kind?: unknown; label?: unknown };
+        kind = typeof v.kind === 'string' ? v.kind : '';
+        label = typeof v.label === 'string' ? v.label : valueToText(value);
+    } else {
+        label = valueToText(value);
+    }
     setFont(ctx, theme);
     ctx.textBaseline = 'middle';
     ctx.fillStyle = '#8b5cf6';
-    ctx.fillText(REL_ICON[v.kind ?? ''] ?? '◇', rect.x + PAD, d.cy);
+    ctx.fillText(REL_ICON[kind] ?? '◇', rect.x + PAD, d.cy);
     ctx.font = `13px ${MONO}`;
     ctx.fillStyle = d.textColor;
-    ctx.fillText(truncate(v.label ?? '', 28), rect.x + PAD + 18, d.cy);
+    const tx = rect.x + PAD + 18;
+    const max = Math.floor((d.rightLimit - tx) / 7.2);
+    ctx.fillText(truncate(label, Math.max(4, Math.min(28, max))), tx, d.cy);
 }
 
 function drawJsonPath(d: DrawCtx, value: unknown): void {
@@ -389,10 +463,13 @@ function drawFlagBackground(ctx: CanvasRenderingContext2D, rect: Rectangle, flag
 }
 
 function drawConfidenceTint(ctx: CanvasRenderingContext2D, rect: Rectangle, confidence: number | null): void {
-    if (confidence != null && confidence < 0.85) {
-        const opacity = (1 - confidence) * 0.1;
-        ctx.fillStyle = `rgba(254,202,202,${opacity})`;
-        ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
+    if (confidence != null && Number.isFinite(confidence)) {
+        const clamped = Math.max(0, Math.min(1, confidence));
+        if (clamped < 0.85) {
+            const opacity = (1 - clamped) * 0.1;
+            ctx.fillStyle = `rgba(254,202,202,${opacity})`;
+            ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
+        }
     }
 }
 
@@ -511,11 +588,7 @@ function drawByFormat(d: DrawCtx, data: AgenticCellData): void {
 /** Used by both the canvas (copyData) and the offscreen a11y mirror. */
 export function cellSummaryText(data: AgenticCellData): string {
     if (data.format === 'rating') {
-        const n = parsePercent(data.value);
-        return n == null ? '' : `${Math.max(0, Math.min(5, Math.round(n)))}/5`;
-    }
-    if (data.format === 'percentage' || data.format === 'json_path') {
-        return valueToText(data.value);
+        return formatRating(data.value);
     }
     return valueToText(data.value);
 }

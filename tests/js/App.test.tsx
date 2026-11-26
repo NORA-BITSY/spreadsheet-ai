@@ -48,5 +48,6 @@ describe('App shell', () => {
         expect(screen.getByRole('heading', { name: /Ogni colonna/i })).toBeInTheDocument();
         expect(screen.getAllByRole('tab')).toHaveLength(5);
         expect(screen.getByRole('button', { name: /Run all/i })).toBeInTheDocument();
+        expect(screen.getByRole('status', { name: /Mock mode/i })).toHaveAttribute('data-mode', 'mock');
     });
 });

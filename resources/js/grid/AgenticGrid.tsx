@@ -95,7 +95,7 @@ export function AgenticGrid({
         citationsRef.current.clear();
     }
 
-    const theme = useMemo(() => buildGlideTheme(), [themeVersion]);
+    const { aiHeaderColor, ...theme } = useMemo(() => buildGlideTheme(), [themeVersion]);
 
     const gridColumns = useMemo<GridColumn[]>(() => {
         const base: GridColumn[] = baseColumns.map((c) => ({
@@ -111,11 +111,11 @@ export function AgenticGrid({
                 title: `${icon}  ${c.name}${jp ? '  $path' : ''}`,
                 id: `ai:${c.index}`,
                 width: aiColumnWidth(preset, protoId),
-                themeOverride: { textHeader: 'var(--ai)' },
+                themeOverride: { textHeader: aiHeaderColor ?? '#8b5cf6' },
             };
         });
         return [...base, ...ai];
-    }, [baseColumns, columns, preset]);
+    }, [baseColumns, columns, preset, aiHeaderColor]);
 
     const getCellContent = useCallback(
         ([col, row]: Item): GridCell => {

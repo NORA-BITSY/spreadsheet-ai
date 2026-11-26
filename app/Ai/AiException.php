@@ -14,6 +14,4 @@ use RuntimeException;
  * which may leak hostnames, API keys, or auth headers. The real provider
  * message is logged server-side at the throw site.
  */
-class AiException extends RuntimeException
-{
-}
+class AiException extends RuntimeException {}

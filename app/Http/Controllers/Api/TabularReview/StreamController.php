@@ -11,6 +11,7 @@ use App\Services\TabularReview\TabularReviewExtractor;
 use App\Support\TabularReview\CellFlag;
 use App\Support\TabularReview\CellStatus;
 use App\Support\TabularReview\PresetData;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -29,7 +30,7 @@ class StreamController extends Controller
      *  - cols=0,1   restrict to these column indexes
      *  - force=1    recompute every targeted cell (else cells already `ready` are skipped)
      */
-    public function stream(Request $request, int $id): StreamedResponse
+    public function stream(Request $request, int $id): StreamedResponse|JsonResponse
     {
         $review = TabularReview::query()->where('tenant_id', 'demo')->find($id);
 
@@ -37,7 +38,14 @@ class StreamController extends Controller
             throw new NotFoundHttpException("Review [{$id}] not found.");
         }
 
-        $columnIndexes = $this->parseCols($request->query('cols'));
+        $columnCount = count(array_values($review->columns_config ?? []));
+        $parsedCols = $this->parseCols($request->query('cols'), $columnCount);
+
+        if ($parsedCols === false) {
+            return response()->json(['message' => 'Invalid cols parameter.'], 422);
+        }
+
+        $columnIndexes = $parsedCols;
         $force = $request->boolean('force');
         $preset = PresetData::preset((string) $review->preset_key) ?? [];
         $rows = array_values($preset['rows'] ?? []);
@@ -45,7 +53,13 @@ class StreamController extends Controller
         $mock = (bool) config('tabular.mock', true);
 
         return new StreamedResponse(function () use ($review, $rows, $columnIndexes, $force, $pacingMs, $mock): void {
+            @set_time_limit(0);
+
             $onCell = function (TabularCell $cell) use ($pacingMs, $mock): void {
+                if (connection_aborted()) {
+                    return;
+                }
+
                 $this->emit('cell', [
                     'row_id' => $cell->row_id,
                     'column_index' => $cell->column_index,
@@ -61,6 +75,10 @@ class StreamController extends Controller
             };
 
             foreach ($rows as $rowIndex => $row) {
+                if (connection_aborted()) {
+                    break;
+                }
+
                 $rowId = $this->extractor->rowId($row, $rowIndex);
 
                 try {
@@ -72,10 +90,15 @@ class StreamController extends Controller
                         'review_id' => $review->id,
                         'row_id' => $rowId,
                         'exception' => $e::class,
+                        'message' => $e->getMessage(),
                     ]);
 
                     $errorIndexes = $columnIndexes ?? array_keys(array_values($review->columns_config ?? []));
                     foreach ($errorIndexes ?: [0] as $colIdx) {
+                        if (connection_aborted()) {
+                            break 2;
+                        }
+
                         $this->emit('cell', [
                             'row_id' => $rowId,
                             'column_index' => $colIdx,
@@ -93,7 +116,9 @@ class StreamController extends Controller
                 }
             }
 
-            $this->emit('done', ['review_id' => $review->id]);
+            if (! connection_aborted()) {
+                $this->emit('done', ['review_id' => $review->id]);
+            }
         }, 200, [
             'Content-Type' => 'text/event-stream',
             'Cache-Control' => 'no-cache',
@@ -123,22 +148,44 @@ class StreamController extends Controller
     }
 
     /**
-     * @return list<int>|null
+     * Validate and parse `?cols=0,1`.
+     *
+     * Returns:
+     *  - null when omitted / empty (meaning "all columns"),
+     *  - list<int> (deduplicated) when valid,
+     *  - false when any token is non-digit, negative, empty, or out of bounds.
+     *
+     * @return list<int>|null|false
      */
-    private function parseCols(mixed $cols): ?array
+    private function parseCols(mixed $cols, int $columnCount): array|null|false
     {
-        if (! is_string($cols) || trim($cols) === '') {
+        if ($cols === null) {
+            return null;
+        }
+
+        if (! is_string($cols)) {
+            return false;
+        }
+
+        if (trim($cols) === '') {
             return null;
         }
 
         $out = [];
         foreach (explode(',', $cols) as $c) {
-            $c = trim($c);
-            if ($c !== '' && ctype_digit($c)) {
-                $out[] = (int) $c;
+            $token = trim($c);
+            if ($token === '' || ! ctype_digit($token)) {
+                return false;
             }
+
+            $idx = (int) $token;
+            if ($idx >= $columnCount) {
+                return false;
+            }
+
+            $out[] = $idx;
         }
 
-        return $out === [] ? null : $out;
+        return array_values(array_unique($out));
     }
 }

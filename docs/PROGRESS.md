@@ -2,9 +2,11 @@
 
 Live "where am I" log. Newest first. Resume from the top after any interruption.
 
-## 2026-11-20 — LaTeX court-filing template
-- Added the reusable template at `templates/court-filing/` with `main.tex`, `court-filing.sty`, usage instructions, and generated-file ignore rules.
-- No LaTeX compiler is installed in this environment, so compilation could not be run; file-presence and package-guard checks pass.
+## 2026-11-26 — M9 Production Readiness Hardening
+- Updated `README.md`: added GitHub `[!WARNING]` callout for unauthenticated demo API before exposing Live mode publicly, clarified server-controlled `TABULAR_AI_MOCK` behavior (read-only toolbar badge), documented `TABULAR_SSE_PACING_MS`, `TABULAR_RATE_LIMIT_API`, `TABULAR_RATE_LIMIT_STREAM`, added `npm run phpunit` note, and added a **Production Considerations & API Reference** section (synchronous SSE/Nginx caveats, SQLite WAL vs Postgres/MySQL, 6 `/api/*` endpoints).
+- Resolved factual drift across `AGENTS.md`, `CLAUDE.md`, `docs/RULES.md`, `docs/plan.md`, and `.claude/skills/spreadsheet-ai-plan/SKILL.md`: standardized model ID to `claude-haiku-4-5`, mock env var to `TABULAR_AI_MOCK=true`, PHP constraint to `^8.4`, removed contradicted `npx npm@10 ci --dry-run` instruction, marked external Windows `%USERPROFILE%\...` paths as historical/author-local, and updated completed M2/M7 items + `docs/plan.md` §5 status pointer.
+- Cleaned up `docs/PROGRESS.md` (removed unrelated LaTeX template entry, restored reverse-chronological order in the `2026-05-26` section) and `docs/LESSON.md` (added missing M4/M3/M2/M1 review section headings, marked superseded items clearly).
+- Cleaned up `.env.example`: set `APP_NAME="Spreadsheet-AI"`, added `TABULAR_RATE_LIMIT_API=120` and `TABULAR_RATE_LIMIT_STREAM=30`, and trimmed unused Laravel skeleton service blocks (`MEMCACHED_*`, `REDIS_*`, `AWS_*`, `VITE_APP_NAME`).
 
 ## 2026-11-20 — Linux VM quickstart
 - Installed Composer 2.11.2 and PHP 8.4 for the checked-in lockfile; installed dependencies, generated `.env`/app key, and seeded SQLite. Local PHPUnit 65/341, Vitest 112/112, typecheck, build, and Playwright 17/17 pass.
@@ -17,21 +19,32 @@ Live "where am I" log. Newest first. Resume from the top after any interruption.
 
 ## 2026-05-26
 
-### Done
-- Analyzed all sources: article (`article-bozza-italiano.md`), design prototype (`tabular-review-demo/project/*`), AskMyDocs backend (`FormatType`, `TabularReviewExtractor`, `AiManager`, `laravel/ai` usage), and the governance template repo `product_image_discovery_admin`.
-- Confirmed 3 architecture decisions with the user: **SQLite**, **synchronous SSE (no Redis)**, **Mock default + Live toggle**.
-- Wrote `docs/plan.md` (deep analysis §1 + 8 macro tasks M0–M7 with sub-tasks, objectives, guardrails).
-- **M0 governance scaffolding created**: `AGENTS.md`, `CLAUDE.md`, `docs/RULES.md`, `docs/LESSON.md`, `docs/PROGRESS.md`, and the resume skill `.claude/skills/spreadsheet-ai-plan/SKILL.md`.
-- Catalogued screenshot assets in `resources/`: `Tabular-Review-Banner.png`, `Tabular-Review-Ai-suggested.png`, `Tabular-Review-Prompt-Column.png` (for the WOW README in M7.2).
-- User added requirement: final README must be a WOW community README (badges, banner, TOC, idea/intuition, innovation, MikeOSS credit, screenshots, junior-proof quickstart). Captured in plan M7.2.
+### BUILD STATUS: ✅ COMPLETE — M0–M7 all merged to `main`; `v0.1.0` released. v1.0.0 close-out (security bump) in PR #9.
 
-### Repo state
-- Only `LICENSE`, `README.md` (stub), plus the new `docs/`, `AGENTS.md`, `CLAUDE.md`, `.claude/` governance files. No Laravel app / frontend yet.
+### Done (close-out)
+- All 8 milestones merged via the strict gate (CI green + Copilot zero open comments). `v0.1.0` tagged & released. Security: `symfony/polyfill-intl-idn` bumped (CVE-2026-46644), `composer audit` clean. README verified WOW + aligned. Next: tag `v1.0.0`.
 
-### M1 outcome (2026-05-26) — MERGED (PR #2)
-- Laravel 13.8 + `laravel/ai 0.6.7` (anthropic provider). 9 migrations (ecommerce + tabular), models/factories, `PresetData` (ported from data.jsx), seeders, `config/ai.php`+`config/tabular.php`. React 19 + Vite 8 + Tailwind v4 shell, design tokens, Vitest+Playwright tooling, `scripts/run-php.mjs`.
-- Gates green: composer validate, migrate+seed, **phpunit 25/198**, typecheck, vitest, build, e2e. Built by 2 parallel sub-agents (disjoint scopes), integrated + local-Copilot-reviewed by integrator.
-- GitHub Copilot review again not serviced → merged under bounded-wait policy.
+### M7 — release (DONE, MERGED PR #8)
+- CI live (added M5). WOW community README (badges, banner, screenshots, MikeOSS credit, junior quickstart). LESSON distilled into `docs/RULES.md`. License standardized on Apache-2.0 (incl. composer.json). **Tagged `v0.1.0` + GitHub release published.**
+
+### M6 outcome — MERGED (PR #7)
+- CSV export (formula-neutralized) + polish (a11y, no-overflow at 125/150% zoom). Vitest 112, e2e 17/17. Strict loop: CI green (after fixing a Linux-only grid flex `min-width:0` overflow) + **6 Copilot rounds** all resolved.
+
+### M5 outcome (2026-05-26) — MERGED (PR #6) via FULL strict loop
+- Column editor (17-format picker, auto-generate, json_path, cost card, validation), AI Suggest picker, citation side-panel, bulk regenerate. Vitest 93, e2e 12/12.
+- **Strict CI+Copilot loop validated**: CI green (after fixing Vite-manifest + npm-lockfile CI issues) AND GitHub Copilot reviewed across **6 rounds** (8→2→2→2→1→2 findings, all real & fixed: regen structural-sharing bug, editor close-on-success, validation, timer cleanup, gridSelection clearing on preset-switch/delete, test hygiene). All threads resolved before merge.
+- User-review fixes of PR #1–#5 also landed here (workflows UNIQUE, functional `force`, TopChrome buttons, client ReviewResponse typing, doc fixes).
+
+### M4 outcome (2026-05-26) — MERGED (PR #5)
+- Glide canvas grid + 17 renderers + live SSE (single EventSource, run-token guard, atomic updateCells, skeleton+progress) + a11y mirror table. Vitest 63, e2e 6/6, visual matches banner. Local Copilot review applied. SSE blocks single artisan-serve worker → Playwright workers:1.
+
+### M3 outcome (2026-05-26) — MERGED (PR #4)
+- React 19 page shell: CSRF API client, TanStack Query hooks (useReview seeds cell store), cell store keyed row:col, components TopChrome/Hero/PresetChips/ActionBar/StatusFooter/GridPlaceholder/Toast/TabularPage. Vitest 30, e2e 3/3, typecheck+build clean. Local Copilot review applied. base_columns lacks width (M4 assigns).
+
+### M2 outcome (2026-05-26) — MERGED (PR #3)
+- Backend engine: 17-format enum, JsonPathResolver, RowContextBuilder, FlagClassifier, TabularAiClient (laravel/ai `agent()->prompt()`), TabularReviewExtractor (Mock+Live, R14, atomic upsert), ReviewHydrator, REST API, synchronous SSE. **62 phpunit / 336 assertions.** Live API smoke OK. Local Copilot review applied; nested .gitignore restored + generated artifacts untracked. GitHub Copilot posted a transient/empty review.
+- **API contract**: `GET /api/reviews/{preset}` → `{review:{id,preset_key,title,row_source}, base_columns:[{id,name}], columns:[{index,name,prompt,format,enum_values?,json_path?}], rows:[{row_id,...displayFields}], cells:[{row_id,column_index,content,flag,confidence,status}], suggestions_available}`. `GET /api/suggest/{preset}` → `{preset, suggestions:[{name,format,prompt,enum_values?}]}`. Column CRUD: POST/PATCH/DELETE `/api/reviews/{id}/columns[/{index}]`. SSE: `GET /api/reviews/{id}/stream?cols=&force=`.
+- **TODO (M4)**: `base_columns` only returns `{id,name}` — width/align/mono lost vs prototype. Enrich the API (small backend tweak) or default widths client-side in M4.
 
 ### M2 local Copilot review outcome (2026-05-26)
 - Full diff `.review-diff.patch` reviewed. 6 issues found and fixed:
@@ -44,36 +57,20 @@ Live "where am I" log. Newest first. Resume from the top after any interruption.
   7. `TabularReviewExtractor::extractReview` — documented the `$force` parameter as reserved/no-op.
 - All 162 tests green after fixes.
 
-### M2 outcome (2026-05-26) — MERGED (PR #3)
-- Backend engine: 17-format enum, JsonPathResolver, RowContextBuilder, FlagClassifier, TabularAiClient (laravel/ai `agent()->prompt()`), TabularReviewExtractor (Mock+Live, R14, atomic upsert), ReviewHydrator, REST API, synchronous SSE. **62 phpunit / 336 assertions.** Live API smoke OK. Local Copilot review applied; nested .gitignore restored + generated artifacts untracked. GitHub Copilot posted a transient/empty review.
-- **API contract**: `GET /api/reviews/{preset}` → `{review:{id,preset_key,title,row_source}, base_columns:[{id,name}], columns:[{index,name,prompt,format,enum_values?,json_path?}], rows:[{row_id,...displayFields}], cells:[{row_id,column_index,content,flag,confidence,status}], suggestions_available}`. `GET /api/suggest/{preset}` → `{preset, suggestions:[{name,format,prompt,enum_values?}]}`. Column CRUD: POST/PATCH/DELETE `/api/reviews/{id}/columns[/{index}]`. SSE: `GET /api/reviews/{id}/stream?cols=&force=`.
-- **TODO (M4)**: `base_columns` only returns `{id,name}` — width/align/mono lost vs prototype. Enrich the API (small backend tweak) or default widths client-side in M4.
+### M1 outcome (2026-05-26) — MERGED (PR #2)
+- Laravel 13.8 + `laravel/ai 0.6.7` (anthropic provider). 9 migrations (ecommerce + tabular), models/factories, `PresetData` (ported from data.jsx), seeders, `config/ai.php`+`config/tabular.php`. React 19 + Vite 8 + Tailwind v4 shell, design tokens, Vitest+Playwright tooling, `scripts/run-php.mjs`.
+- Gates green: composer validate, migrate+seed, **phpunit 25/198**, typecheck, vitest, build, e2e. Built by 2 parallel sub-agents (disjoint scopes), integrated + local-Copilot-reviewed by integrator.
+- GitHub Copilot review again not serviced → merged under bounded-wait policy.
 
-### M3 outcome (2026-05-26) — MERGED (PR #4)
-- React 19 page shell: CSRF API client, TanStack Query hooks (useReview seeds cell store), cell store keyed row:col, components TopChrome/Hero/PresetChips/ActionBar/StatusFooter/GridPlaceholder/Toast/TabularPage. Vitest 30, e2e 3/3, typecheck+build clean. Local Copilot review applied. base_columns lacks width (M4 assigns).
-
-### M4 outcome (2026-05-26) — MERGED (PR #5)
-- Glide canvas grid + 17 renderers + live SSE (single EventSource, run-token guard, atomic updateCells, skeleton+progress) + a11y mirror table. Vitest 63, e2e 6/6, visual matches banner. Local Copilot review applied. SSE blocks single artisan-serve worker → Playwright workers:1.
-
-### M5 outcome (2026-05-26) — MERGED (PR #6) via FULL strict loop
-- Column editor (17-format picker, auto-generate, json_path, cost card, validation), AI Suggest picker, citation side-panel, bulk regenerate. Vitest 93, e2e 12/12.
-- **Strict CI+Copilot loop validated**: CI green (after fixing Vite-manifest + npm-lockfile CI issues) AND GitHub Copilot reviewed across **6 rounds** (8→2→2→2→1→2 findings, all real & fixed: regen structural-sharing bug, editor close-on-success, validation, timer cleanup, gridSelection clearing on preset-switch/delete, test hygiene). All threads resolved before merge.
-- User-review fixes of PR #1–#5 also landed here (workflows UNIQUE, functional `force`, TopChrome buttons, client ReviewResponse typing, doc fixes).
-
-### M6 outcome — MERGED (PR #7)
-- CSV export (formula-neutralized) + polish (a11y, no-overflow at 125/150% zoom). Vitest 112, e2e 17/17. Strict loop: CI green (after fixing a Linux-only grid flex `min-width:0` overflow) + **6 Copilot rounds** all resolved.
-
-### M7 — release (DONE, MERGED PR #8)
-- CI live (added M5). WOW community README (badges, banner, screenshots, MikeOSS credit, junior quickstart). LESSON distilled into `docs/RULES.md`. License standardized on Apache-2.0 (incl. composer.json). **Tagged `v0.1.0` + GitHub release published.**
-
-### BUILD STATUS: ✅ COMPLETE — M0–M7 all merged to `main`; `v0.1.0` released. v1.0.0 close-out (security bump) in PR #9.
-
-### Done (close-out)
-- All 8 milestones merged via the strict gate (CI green + Copilot zero open comments). `v0.1.0` tagged & released. Security: `symfony/polyfill-intl-idn` bumped (CVE-2026-46644), `composer audit` clean. README verified WOW + aligned. Next: tag `v1.0.0`.
+### M0 outcome (2026-05-26) — MERGED (PR #1)
+- Analyzed all sources: article (`article-bozza-italiano.md`), design prototype (`tabular-review-demo/project/*`), AskMyDocs backend (`FormatType`, `TabularReviewExtractor`, `AiManager`, `laravel/ai` usage), and the governance template repo `product_image_discovery_admin`.
+- Confirmed 3 architecture decisions with the user: **SQLite**, **synchronous SSE (no Redis)**, **Mock default + Live mode**.
+- Wrote `docs/plan.md` (deep analysis §1 + 8 macro tasks M0–M7 with sub-tasks, objectives, guardrails).
+- **M0 governance scaffolding created**: `AGENTS.md`, `CLAUDE.md`, `docs/RULES.md`, `docs/LESSON.md`, `docs/PROGRESS.md`, and the resume skill `.claude/skills/spreadsheet-ai-plan/SKILL.md`.
+- Catalogued screenshot assets in `resources/`: `Tabular-Review-Banner.png`, `Tabular-Review-Ai-suggested.png`, `Tabular-Review-Prompt-Column.png` (for the WOW README in M7.2).
+- User added requirement: final README must be a WOW community README (badges, banner, TOC, idea/intuition, innovation, MikeOSS credit, screenshots, junior-proof quickstart). Captured in plan M7.2.
+- PR #1 `task/m0-governance` → `main`: local Copilot `/review` passed (13 fixes), local gates N/A (docs only), GitHub Copilot review unavailable → merged under the bounded-wait policy.
 
 ### Blockers
 - **GitHub Copilot PR review — RESOLVED understanding**: initially looked "not serviced" (PR #1: request cleared instantly), but from PR #3 onward it posts real inline reviews — just **slow/intermittent** (minutes). The bounded-wait "merge anyway" policy was **REVOKED**; binding gate is now CI green + Copilot reviewed with zero unresolved comments (see `docs/LESSON.md` + `docs/RULES.md`). Validated across M5–M7.
 - ~~License mismatch: repo is Apache-2.0, README/article say MIT → resolve in M7.~~ **RESOLVED (M7):** README badges + License section now state Apache-2.0 accurately.
-
-### M0 outcome (2026-05-26)
-- PR #1 `task/m0-governance` → `main`: local Copilot `/review` passed (13 fixes), local gates N/A (docs only), GitHub Copilot review unavailable → merged under the bounded-wait policy.

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Suggestion } from '../api/client';
+import type { AiMode, Suggestion } from '../api/client';
 import { AiSuggestPopover } from './AiSuggestPopover';
 
 export interface RunProgress {
@@ -16,10 +16,11 @@ interface ActionBarProps {
     onPickSuggestion: (s: Suggestion) => void;
     running: boolean;
     progress: RunProgress;
-    liveMode: boolean;
-    onToggleLiveMode: () => void;
+    aiMode?: AiMode;
     suggestions: Suggestion[];
     suggestionsLoading?: boolean;
+    suggestionsError?: boolean;
+    onRetrySuggestions?: () => void;
 }
 
 function SparkleIcon() {
@@ -40,15 +41,24 @@ export function ActionBar({
     onPickSuggestion,
     running,
     progress,
-    liveMode,
-    onToggleLiveMode,
+    aiMode,
     suggestions,
     suggestionsLoading = false,
+    suggestionsError = false,
+    onRetrySuggestions,
 }: ActionBarProps) {
     const [popOpen, setPopOpen] = useState(false);
     const [anchor, setAnchor] = useState<{ top: number; left: number }>({ top: 96, left: 32 });
     const aiBtnRef = useRef<HTMLButtonElement>(null);
     const pct = progress.total > 0 ? Math.min(100, (progress.done / progress.total) * 100) : 0;
+    const isLive = aiMode != null && !aiMode.mock;
+    const modelLabel = aiMode?.model || 'claude-haiku-4.5';
+    const modeAriaLabel = isLive
+        ? `Server AI mode: Live LLM · ${modelLabel}`
+        : 'Server AI mode: Mock mode · no API calls';
+    const modeTitle = isLive
+        ? `Live LLM (${modelLabel}). Set TABULAR_AI_MOCK=true in .env to switch to Mock mode.`
+        : 'Mock mode (no API calls). Set TABULAR_AI_MOCK=false in .env to enable Live LLM mode.';
 
     const togglePopover = () => {
         const btn = aiBtnRef.current;
@@ -90,19 +100,19 @@ export function ActionBar({
                     Add column
                 </button>
                 <span className="divider-v" aria-hidden="true" />
-                <button
-                    className={`llm-toggle ${liveMode ? 'on' : 'off'}`}
-                    type="button"
-                    onClick={onToggleLiveMode}
-                    aria-pressed={liveMode}
-                    title={liveMode ? 'Live mode · calls the LLM' : 'Mock mode · no API calls'}
+                <span
+                    className={`llm-toggle llm-mode-badge ${isLive ? 'on' : 'off'}`}
+                    role="status"
+                    data-mode={isLive ? 'live' : 'mock'}
+                    aria-label={modeAriaLabel}
+                    title={modeTitle}
                 >
                     <span className="llm-toggle-dot" aria-hidden="true" />
                     <span className="llm-toggle-text">
-                        {liveMode ? (
+                        {isLive ? (
                             <>
                                 <b>Live LLM</b>
-                                <small className="mono">claude-haiku-4.5</small>
+                                <small className="mono">{modelLabel}</small>
                             </>
                         ) : (
                             <>
@@ -111,7 +121,7 @@ export function ActionBar({
                             </>
                         )}
                     </span>
-                </button>
+                </span>
             </div>
             <div className="action-bar-right">
                 {running ? (
@@ -169,6 +179,8 @@ export function ActionBar({
                 open={popOpen}
                 suggestions={suggestions}
                 loading={suggestionsLoading}
+                isError={suggestionsError}
+                onRetry={onRetrySuggestions}
                 anchor={anchor}
                 onPick={(s) => {
                     onPickSuggestion(s);

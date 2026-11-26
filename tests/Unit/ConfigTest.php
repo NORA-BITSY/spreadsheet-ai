@@ -27,5 +27,7 @@ class ConfigTest extends TestCase
         $this->assertSame('claude-haiku-4-5', config('tabular.model'));
         $this->assertSame(1200, config('tabular.max_tokens'));
         $this->assertSame(0.1, config('tabular.temperature'));
+        $this->assertSame(120, config('tabular.rate_limit_api'));
+        $this->assertSame(30, config('tabular.rate_limit_stream'));
     }
 }

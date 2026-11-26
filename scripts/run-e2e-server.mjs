@@ -27,7 +27,7 @@ const migrate = spawnSync(
 );
 
 if (migrate.error || migrate.status !== 0) {
-    rmSync(directory, { recursive: true });
+    rmSync(directory, { recursive: true, force: true });
     throw migrate.error ?? new Error(`Database setup failed with exit code ${migrate.status}`);
 }
 
@@ -43,7 +43,7 @@ server.on('error', (error) => {
 });
 
 server.on('close', (code, signal) => {
-    rmSync(directory, { recursive: true });
+    rmSync(directory, { recursive: true, force: true });
     process.exitCode = shuttingDown ? 0 : (code ?? 1);
 });
 

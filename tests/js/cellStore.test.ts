@@ -49,4 +49,26 @@ describe('cell store', () => {
         store.set(makeCell('R3', 0));
         expect(calls).toBe(3);
     });
+
+    it('batchSet upserts many cells with a single subscriber notification', () => {
+        const store = createCellStore();
+        let calls = 0;
+        store.subscribe(() => calls++);
+        store.batchSet([makeCell('R1', 0), makeCell('R1', 1), makeCell('R2', 0)]);
+        expect(calls).toBe(1);
+        expect(store.size()).toBe(3);
+        expect(store.get('R2', 0)?.row_id).toBe('R2');
+    });
+
+    it('batchRemove deletes multiple keys with a single subscriber notification', () => {
+        const store = createCellStore();
+        store.batchSet([makeCell('R1', 0), makeCell('R1', 1), makeCell('R2', 0)]);
+        let calls = 0;
+        store.subscribe(() => calls++);
+        store.batchRemove(['R1:0', 'R2:0']);
+        expect(calls).toBe(1);
+        expect(store.size()).toBe(1);
+        expect(store.get('R1', 1)).toBeDefined();
+        expect(store.get('R1', 0)).toBeUndefined();
+    });
 });

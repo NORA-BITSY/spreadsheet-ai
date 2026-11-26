@@ -37,15 +37,6 @@ yarn-error.log
 .DS_Store
 Thumbs.db
 
-# Playwright MCP scratch
+# Scratch / local tooling
 .playwright-mcp/
-LibreChat/
-LibreChat-litdb-lc-rf-001/
-XortronOS/
-litdb/
-litdb-platform/
-litdb-platform-lc-rf-001/
-llama.cpp/
-photo-indexer/
-porn/
-ragflow/
+.omo/

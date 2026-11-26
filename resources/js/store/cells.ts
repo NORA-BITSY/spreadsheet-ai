@@ -18,6 +18,10 @@ export interface CellStore {
     bulkLoad(cells: Cell[]): void;
     /** Upsert a single cell. */
     set(cell: Cell): void;
+    /** Upsert multiple cells in a single Map clone and subscriber notification. */
+    batchSet(cells: Cell[]): void;
+    /** Remove multiple cells by key in a single Map clone and subscriber notification. */
+    batchRemove(keys: CellKey[]): void;
     /** Read a single cell, or undefined if not present. */
     get(rowId: string, columnIndex: number): Cell | undefined;
     /** Read by raw key. */
@@ -59,6 +63,26 @@ export function createCellStore(): SubscribableCellStore {
         set(cell: Cell) {
             map = new Map(map);
             map.set(cellKey(cell.row_id, cell.column_index), cell);
+            emit();
+        },
+        batchSet(cells: Cell[]) {
+            if (cells.length === 0) return;
+            const next = new Map(map);
+            for (const cell of cells) {
+                next.set(cellKey(cell.row_id, cell.column_index), cell);
+            }
+            map = next;
+            emit();
+        },
+        batchRemove(keys: CellKey[]) {
+            if (keys.length === 0) return;
+            const next = new Map(map);
+            let changed = false;
+            for (const key of keys) {
+                if (next.delete(key)) changed = true;
+            }
+            if (!changed) return;
+            map = next;
             emit();
         },
         get(rowId: string, columnIndex: number) {

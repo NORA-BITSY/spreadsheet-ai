@@ -14,7 +14,7 @@ class JsonPathResolverTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->resolver = new JsonPathResolver();
+        $this->resolver = new JsonPathResolver;
     }
 
     public function test_resolves_dollar_dot_notation(): void

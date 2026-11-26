@@ -11,8 +11,8 @@ flag + citation. Laravel 13 + React/Vite/Tailwind + Glide Data Grid + `laravel/a
 ## Locked decisions
 - DB: **SQLite** (`database/database.sqlite`). Rows seeded from the 5 demo presets.
 - Streaming: **synchronous SSE, no Redis/Horizon**.
-- LLM: **Mock by default + Live toggle** (`laravel/ai`, Anthropic `claude-haiku-4.5`).
-- Pixel target: the rendered design in `resources/Tabular-Review-Banner.png` and the prototype in `%USERPROFILE%\Downloads\SpreadsheetAi\tabular-review-demo\project\`.
+- LLM: **Mock by default (`TABULAR_AI_MOCK=true`) + server-controlled Live mode via `.env`** (`laravel/ai`, Anthropic `claude-haiku-4-5`).
+- Pixel target: the rendered design in `resources/Tabular-Review-Banner.png` (the original Windows prototype at `%USERPROFILE%\Downloads\SpreadsheetAi\tabular-review-demo\project\` is historical/author-local; the codebase is now self-contained).
 
 ## How to work here
 - Read on every session: `AGENTS.md`, `docs/plan.md`, `docs/PROGRESS.md`, `docs/LESSON.md`, `docs/RULES.md`.

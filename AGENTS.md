@@ -10,7 +10,7 @@ rows = e-commerce entities, columns = LLM prompts, cells = AI values with
 confidence flag + citation. Laravel 13 + React/Vite/Tailwind + Glide Data Grid,
 LLM via the `laravel/ai` SDK. See `docs/plan.md` §0 for the full brief and the
 three locked architecture decisions (SQLite · synchronous SSE no-Redis · Mock
-default + Live toggle).
+default via `TABULAR_AI_MOCK=true` + Live mode via `.env`).
 
 ## Required context files (every session, every sub-agent)
 - `docs/plan.md` — canonical plan + deep analysis + task breakdown.
@@ -18,10 +18,11 @@ default + Live toggle).
 - `docs/LESSON.md` — non-obvious facts / fixes. Update whenever you learn one (including from Copilot feedback).
 - `docs/RULES.md` — binding implementation/security/testing/review rules.
 
-## Reference sources (do not re-derive — read them)
+## Reference sources (historical / author-local — codebase is now self-contained)
+These original Windows paths were used during initial M0–M7 scaffolding and are no longer required to work in this repo:
 - Article: `%USERPROFILE%\Downloads\medium\SpreadsheetAi\article-bozza-italiano.md`
 - Design prototype (pixel reference): `%USERPROFILE%\Downloads\SpreadsheetAi\tabular-review-demo\project\`
-- Backend patterns to copy: `%USERPROFILE%\Documents\DocLore\Visual Basic\Ai\AskMyDocs` (`app/Support/TabularReview/FormatType.php`, `app/Services/TabularReview/TabularReviewExtractor.php`, `app/Ai/AiManager.php`).
+- Backend patterns: `%USERPROFILE%\Documents\DocLore\Visual Basic\Ai\AskMyDocs` (`app/Support/TabularReview/FormatType.php`, `app/Services/TabularReview/TabularReviewExtractor.php`, `app/Ai/AiManager.php`).
 - Governance template: `%USERPROFILE%\Documents\DocLore\Visual Basic\Ai\product_image_discovery_admin`.
 
 ## Branch & PR loop (mandatory)
@@ -65,10 +66,9 @@ Then verify: `gh pr view <PR> --json reviewRequests` must list the `Copilot` bot
 ## Environment (Windows / Herd)
 - Use **Herd PHP** (`%USERPROFILE%\.config\herd\bin\php84\php.exe`), not XAMPP. Set `PHP_BINARY` if `php` is not on PATH. (Herd PHP 8.4 satisfies the `^8.4` composer constraint.)
 - Run the PHPUnit gate through an `npm run phpunit` wrapper (`scripts/run-php.mjs`) to avoid stale PATH / XAMPP resolution.
-- Vitest in CI: `pool: 'threads'`, `LARAVEL_BYPASS_ENV_CHECK=1`. Validate lockfiles with `npx npm@10 ci --dry-run`.
+- Vitest in CI: `pool: 'threads'`, `LARAVEL_BYPASS_ENV_CHECK=1`. CI installs frontend deps with `npm install --no-audit --no-fund` (Windows-generated `package-lock.json` omits Linux optional native deps).
 - If a gate is blocked by sandbox/network, record the exact blocker in `docs/PROGRESS.md` — do not silently skip.
 - **Skill directory**: the resume skill lives at `.claude/skills/spreadsheet-ai-plan/SKILL.md`. If `.claude/skills/` is sandbox-blocked, fall back to a repo-local `skills/` directory.
 
-## Final task
-After all macro tasks, fold `docs/LESSON.md` learnings back into `docs/RULES.md`,
-the skills, this file, and `CLAUDE.md`, then tag `v0.1.0` and cut the GitHub release.
+## Ongoing knowledge consolidation
+M0–M7 are complete (`v0.1.0` tagged and released; initial `docs/LESSON.md` learnings folded into `docs/RULES.md`). Continue folding new learnings from follow-up milestones (e.g. M9 production-readiness hardening) back into `docs/RULES.md`, the skills, this file, and `CLAUDE.md`.

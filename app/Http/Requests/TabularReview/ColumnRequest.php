@@ -34,11 +34,13 @@ class ColumnRequest extends FormRequest
             'format' => ['required', 'string', Rule::in(FormatType::values())],
             'prompt' => ['nullable', 'string', 'max:2000'],
             'enum_values' => [
+                'nullable',
                 'array',
                 'min:1',
+                'max:50',
                 Rule::requiredIf(fn () => $this->input('format') === FormatType::ENUM->value),
             ],
-            'enum_values.*' => ['string', 'max:120'],
+            'enum_values.*' => ['required', 'string', 'max:120', 'not_regex:/^\s*$/'],
             'json_path' => [
                 'nullable',
                 'string',

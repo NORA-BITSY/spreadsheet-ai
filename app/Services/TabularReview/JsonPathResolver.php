@@ -103,7 +103,7 @@ class JsonPathResolver
         }
 
         try {
-            return json_encode($value, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
+            return json_encode($value, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
         } catch (\JsonException $e) {
             Log::warning('JsonPathResolver encode failed', ['message' => $e->getMessage()]);
 

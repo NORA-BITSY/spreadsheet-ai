@@ -15,6 +15,8 @@ export interface AiSuggestPopoverProps {
     open: boolean;
     suggestions: Suggestion[];
     loading?: boolean;
+    isError?: boolean;
+    onRetry?: () => void;
     onPick: (s: Suggestion) => void;
     onClose: () => void;
     /** Inline positioning (top/left) anchored under the AI Suggest button. */
@@ -41,6 +43,8 @@ export function AiSuggestPopover({
     open,
     suggestions,
     loading = false,
+    isError = false,
+    onRetry,
     onPick,
     onClose,
     anchor,
@@ -61,12 +65,23 @@ export function AiSuggestPopover({
                 </div>
                 <div className="popover-list">
                     {loading && <div className="empty">Caricamento…</div>}
-                    {!loading && suggestions.length === 0 && (
+                    {!loading && isError && (
+                        <div className="empty" role="alert" style={{ padding: '20px 14px' }}>
+                            <p style={{ margin: '0 0 10px' }}>Impossibile caricare i suggerimenti.</p>
+                            {onRetry && (
+                                <button type="button" className="btn sm primary" onClick={onRetry}>
+                                    Retry
+                                </button>
+                            )}
+                        </div>
+                    )}
+                    {!loading && !isError && suggestions.length === 0 && (
                         <div className="empty" style={{ padding: '20px 14px' }}>
                             Niente da suggerire per questo preset.
                         </div>
                     )}
                     {!loading &&
+                        !isError &&
                         suggestions.map((s) => (
                             <button
                                 key={s.name}

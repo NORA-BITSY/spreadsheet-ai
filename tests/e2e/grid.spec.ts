@@ -87,15 +87,17 @@ test.describe('Glide grid streaming (M4)', () => {
         await expect(page.getByTestId('cell-RET-1042-0')).toHaveText('Wrong Size', { timeout: 30_000 });
         await page.getByRole('tab', { name: /Frode Ordini/i }).click();
 
-        // Wait for the fraud grid to finish loading (its mirror shows ORD-* rows).
-        await expect(page.locator(`${MIRROR} tbody tr[data-row-id^="ORD-"]`).first()).toBeAttached({
+        // Wait for the fraud grid to finish loading (all 10 ORD-* rows attached)
+        // and for the aborted returns stream / review fetch to settle.
+        await expect(page.locator(`${MIRROR} tbody tr[data-row-id^="ORD-"]`)).toHaveCount(10, {
             timeout: 15_000,
         });
+        await expect(page.getByRole('button', { name: /Run all/i })).toBeVisible();
+        await expect(page.getByRole('progressbar')).toBeHidden();
+        await page.waitForLoadState('networkidle');
 
-        // Give any late returns events a moment to (incorrectly) arrive, then
-        // assert the run-token guard dropped them: no returns rows, and no
-        // returns-only value ("Wrong Size") bled into the fraud grid.
-        await page.waitForTimeout(1_500);
+        // Assert the run-token guard dropped any late returns events: no returns
+        // rows, and no returns-only value ("Wrong Size") bled into the fraud grid.
         await expect(page.locator(`${MIRROR} tbody tr[data-row-id^="RET-"]`)).toHaveCount(0);
         await expect(page.locator(MIRROR)).not.toContainText('Wrong Size');
     });

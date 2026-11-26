@@ -13,8 +13,12 @@
 // a Blob + object URL. It guards SSR / no-DOM environments (returns false).
 // ============================================================
 
-/** Chars that make a leading character a formula/command trigger in Excel/Sheets. */
-const FORMULA_PREFIXES = new Set(['=', '+', '-', '@', '\t', '\r']);
+/**
+ * Matches values that spreadsheet apps (Excel, Sheets, Calc) may interpret as
+ * formulas or commands: leading TAB/CR/LF, or optional leading whitespace
+ * followed by `=`, `+`, `-`, or `@`.
+ */
+const FORMULA_TRIGGER_RE = /^[\t\r\n]|^\s*[=+\-@]/;
 
 /**
  * Neutralise a single field: prefix `'` if it would be interpreted as a formula,
@@ -22,7 +26,7 @@ const FORMULA_PREFIXES = new Set(['=', '+', '-', '@', '\t', '\r']);
  */
 export function escapeCsvField(value: string): string {
     let field = value;
-    if (field.length > 0 && FORMULA_PREFIXES.has(field[0])) {
+    if (field.length > 0 && FORMULA_TRIGGER_RE.test(field)) {
         field = `'${field}`;
     }
     if (/[",\n\r]/.test(field)) {

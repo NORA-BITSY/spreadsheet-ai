@@ -56,10 +56,10 @@ User did a deep review of the first 5 merged PRs. Fixes applied (on the M5 branc
 - **`autoGenerate` setTimeout not cancelled on re-click**: If the user clicks "Auto-generate" twice quickly, two overlapping timers ran (second would overwrite first). Fixed: store the timer ID in a `useRef<number | null>` and `clearTimeout` before scheduling a new one.
 - **`window.setTimeout` return type vs Node `Timeout`**: `autogenTimerRef` initially typed as `ReturnType<typeof window.setTimeout>` which TypeScript (with `"types": ["node"]` in tsconfig) resolves to `NodeJS.Timeout` instead of `number`. Fix: type as `number | null` explicitly. Note: the tsconfig `"types": [...]` array includes `"node"`, which shadows the browser `setTimeout` return type for `ReturnType<typeof window.setTimeout>` in ambiguous contexts.
 - **`React.CSSProperties` in `AiSuggestPopover` without React import** — Works at runtime (and typecheck passes) because `@types/react` is a transitive dependency and TypeScript resolves the `React` namespace. But it is fragile and relies on ambient injection. Marked as risky (no change needed now; watch for `isolatedModules` stricter enforcement).
-- **`pendingRegenRef` index prediction after deletes (risky — not applied)**: `newIndex = aiColumns.length` is correct only when the server assigns `column_index` equal to the current count (no gaps from prior deletes). If the server ever reuses indices or skips, the effect would wait forever. For the demo (no concurrent add+delete sequences), this is safe. Verify `ColumnController::store` always appends at `count(ai_columns)`.
-- **`pendingRegenRef` single-slot race (risky — not applied)**: Two rapid add-column mutations would overwrite the ref; only the second column would auto-regenerate. Acceptable for the demo; a queue would be needed for production.
+- **`pendingRegenRef` index prediction after deletes `[SUPERSEDED in M5/PR #6]`**: `pendingRegenRef` was removed in PR #6; regeneration now triggers directly in mutation `onSuccess` using the server-returned `lastColumnIndex`.
+- **`pendingRegenRef` single-slot race `[SUPERSEDED in M5/PR #6]`**: resolved by removing `pendingRegenRef` in PR #6.
 
-
+## 2026-05-26 — M4 grid & streaming local review findings (applied)
 - **`drawPercentage` — zero-width fill bar path**: when `pct = 0` (null value or explicit 0), `roundRect` was called with `w = 0` → degenerate path drawn to canvas (harmless but invalid). Fixed: guard `if (pct > 0)` before drawing the fill bar.
 - **`drawJsonPath` — unused `theme` destructuring + `void theme` suppression**: `theme` was extracted from `d` but never used directly (it flows through `{ ...d }` to sub-renderers). Removed the destructure; `void theme` suppression no longer needed.
 - **Citation registry clear: `useEffect` (async) vs. render-time (sync)**: using `useEffect` to clear the `CitationRegistry` on preset change means the registry is cleared AFTER the first render with the new preset, potentially assigning citation indices starting from the old `next` counter rather than 1. Fixed: replaced `useEffect` with a render-phase previous-value comparison (`prevPresetRef`) so the registry is cleared synchronously before `getCellContent` is called for the new preset. Removed the now-unused `useEffect` import from `AgenticGrid.tsx`.
@@ -72,27 +72,28 @@ User did a deep review of the first 5 merged PRs. Fixes applied (on the M5 branc
   - The chunk-size warning (`app.js > 500 kB`) is pre-existing; Glide Data Grid is large. Consider lazy-loading the grid or code-splitting in M7.
   - `marked` in `package.json` is a forward-declare for M5 citation panel; verify and remove if not used by end of M5.
 
-
+## 2026-05-26 — M3 frontend shell local review findings (applied)
 - **`ToastContext.Provider value={{ push }}`** created a new object every render, causing every `useToast()` consumer to re-render on any toast state change. Fixed: extracted `api = useMemo(() => ({ push }), [push])` and passed that as the context value.
 - **`setTimeout` IDs in `ToastProvider` not tracked** — unmounting before timer fire would leak a stale `setToasts` call. Fixed: `timers = useRef<Map<string, timeout>>` stores each timer ID; a cleanup `useEffect` calls `clearTimeout` on all pending timers on unmount. The timer map entry is deleted when the timeout fires naturally.
 - **`onPickSuggestion` in `TabularPage` not memoized** — inline arrow function recreated every render; now `useCallback([toast])` wraps it. With `toast` stable (after context fix above), the prop passed to `ActionBar` is now stable across renders.
 - **Risky — not auto-applied:**
-  - `useUpdateColumn`/`useDeleteColumn` `onError` cast `context as { previous?: ReviewResponse }` — TanStack Query v5 infers context from `onMutate` return, but the explicit `UseMutationResult<…>` return type annotation omits the 4th (context) generic, forcing the cast. Typing it fully is a larger refactor; defer to M4/M5 when these mutations are wired up.
-  - `TopChrome` nav links use `href="#"` with `preventDefault` — screen readers announce these as links. Replace with `<button>` elements in M5 when real routes exist.
+  - `useUpdateColumn`/`useDeleteColumn` `onError` cast `context as { previous?: ReviewResponse }` `[SUPERSEDED in M5]` — fixed via explicit `RollbackCtx` 4th generic in PR #6.
+  - `TopChrome` nav links use `href="#"` with `preventDefault` `[SUPERSEDED in M5]` — replaced with `<button aria-disabled>` in PR #6.
 
-
+## 2026-05-26 — M2 backend engine local review findings (applied)
 - **`JsonPathResolver::stringifyValue` dead branch** — `$encoded === false` after `JSON_THROW_ON_ERROR` is unreachable; removed.
 - **`persistCell` fallback `json_encode` missing flag** — The degraded encode used `JSON_UNESCAPED_UNICODE` only; added `JSON_THROW_ON_ERROR` for consistency (content is hardcoded-safe primitives, won't throw).
 - **`ColumnRequest` `enum_values` allows empty array** — The `requiredIf` only ensured the field was present, not non-empty. Added `'min:1'` rule. Docblock updated.
 - **`StreamController` catch emitted only ONE red cell** — When `extractRow` throws unexpectedly, the catch block used `$columnIndexes[0] ?? 0` (only marks the first column). Fixed to fan out over all `$columnIndexes` (or all configured columns when null).
 - **`emit()` json_encode false guard** — Without `JSON_THROW_ON_ERROR`, a failed encode would emit `data: false` and corrupt the stream. Added a `false` guard that skips the event.
 - **`StreamController` catch missing log** — Added `Log::warning` so unexpected row throws are visible server-side.
-- **`extractReview` `$force` is dead code** — Documented as reserved for future "skip READY cells" optimisation; currently a no-op (upsert always overwrites).
+- **`extractReview` `$force` is dead code `[SUPERSEDED in M5]`** — originally documented as a no-op; made functional in M5 (`extractRow($force)` now skips `ready` cells unless `?force=1` is passed; see `PR #1–#5 user-review fixes` above).
 
+## 2026-05-26 — M1 foundation local review findings (applied)
 - **`QUEUE_CONNECTION` must be `sync` in `.env.example`** — Framework default is `database`, but RULES require `sync`. With `database` queue and no worker, queued jobs would silently never run. Fixed in `.env.example`.
 - **`BuiltinWorkflowSeeder` must be gated to `local`/`testing`** — RULES say "demo seeders gate to local/testing environments." The builtin seeder was missing the env check. Fixed — identical gate to `EcommerceDemoSeeder`.
 - **`TABULAR_SSE_PACING_MS` was absent from `.env.example`** — Listed as `env()` key in `config/tabular.php` but not documented in `.env.example`. Added.
-- **No DB UNIQUE constraint on `workflows(tenant_id, preset_key)`** — The `updateOrCreate` in `BuiltinWorkflowSeeder` is application-level idempotency only. Sufficient for sync-queue demo; adding a DB constraint would require `WorkflowFactory` changes to avoid `(demo, returns)` duplicate violations in tests. Left for M2 if concurrency is introduced.
+- **No DB UNIQUE constraint on `workflows(tenant_id, preset_key)` `[SUPERSEDED in M5]`** — originally deferred at M1; UNIQUE constraint on `(tenant_id, preset_key)` was added in M5 (see `PR #1–#5 user-review fixes` above).
 - **`parseDayMonth()` silent unknown-month fallback** — Returns '05' (May) for any unrecognized abbreviation. Safe for fixed demo data; would silently misbehave on dynamic data. Acceptable for M1.
 
 ## 2026-05-26 — M1 backend foundation (schema, models, seeders, config)

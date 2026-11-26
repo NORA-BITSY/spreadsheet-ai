@@ -69,11 +69,17 @@ test.describe('no horizontal overflow (M6.2)', () => {
 });
 
 test.describe('CSV export (M6.3)', () => {
-    test('Export CSV triggers a download named tabular-<preset>.csv with a neutralised formula', async ({
+    test('Export CSV after generation exports AI cell values with neutralised formulas', async ({
         page,
     }) => {
         await page.goto('/');
         await expect(page.locator('[data-testid="grid-mirror"]')).toBeAttached();
+
+        // Run generation first so the CSV contains actual generated AI cell values.
+        await page.getByRole('button', { name: /Run all/i }).click();
+        await expect(page.getByTestId('cell-RET-1042-0')).toHaveText('Wrong Size', { timeout: 30_000 });
+        await expect(page.getByTestId('cell-RET-1042-3')).toHaveText('1/5');
+        await expect(page.getByRole('button', { name: /Run all/i })).toBeVisible({ timeout: 30_000 });
 
         const [download] = await Promise.all([
             page.waitForEvent('download'),
@@ -118,5 +124,9 @@ test.describe('CSV export (M6.3)', () => {
         expect(lines[0]).toMatch(/Reso|Cliente|Motivo|ID/i);
         // One row per entity (14 returns) + header.
         expect(lines.length).toBe(15);
+        // Generated AI cell values are included in the exported CSV.
+        expect(csv).toContain('RET-1042');
+        expect(csv).toContain('Wrong Size');
+        expect(csv).toContain('1/5');
     });
 });
