@@ -1,0 +1,104 @@
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{court-filing}[2026/11/20 Reusable court filing layout]
+
+\RequirePackage[letterpaper,margin=1in]{geometry}
+\RequirePackage{newtxtext}
+\RequirePackage{setspace}
+\RequirePackage{fancyhdr}
+\RequirePackage{enumitem}
+\RequirePackage{titlesec}
+\RequirePackage[hidelinks]{hyperref}
+\RequirePackage{microtype}
+
+\setstretch{2}
+\setlength{\parindent}{0.5in}
+\setlength{\parskip}{0pt}
+\setlength{\headheight}{15pt}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0pt}
+\titleformat{\section}{\normalfont\bfseries\centering}{\thesection.}{0.5em}{}
+\titleformat{\subsection}{\normalfont\bfseries}{\thesubsection}{0.5em}{}
+\titlespacing*{\section}{0pt}{\baselineskip}{0pt}
+\titlespacing*{\subsection}{0pt}{\baselineskip}{0pt}
+
+\makeatletter
+
+\newcommand{\courtname}[1]{\def\@courtname{#1}}
+\newcommand{\courtdivision}[1]{\def\@courtdivision{#1}}
+\newcommand{\casenumber}[1]{\def\@casenumber{#1}}
+\newcommand{\plaintiff}[1]{\def\@plaintiff{#1}}
+\newcommand{\defendant}[1]{\def\@defendant{#1}}
+\newcommand{\documenttitle}[1]{\def\@documenttitle{#1}}
+\newcommand{\filingdate}[1]{\def\@filingdate{#1}}
+\newcommand{\attorneyname}[1]{\def\@attorneyname{#1}}
+\newcommand{\attorneybar}[1]{\def\@attorneybar{#1}}
+\newcommand{\attorneyfirm}[1]{\def\@attorneyfirm{#1}}
+\newcommand{\attorneyaddress}[1]{\def\@attorneyaddress{#1}}
+\newcommand{\attorneycontact}[1]{\def\@attorneycontact{#1}}
+
+
+\newcommand{\makecaption}{%
+  \begin{center}
+    {\bfseries \@courtname\par}
+    \@courtdivision\par
+  \end{center}
+  \vspace{\baselineskip}
+  \noindent
+  \begin{minipage}[t]{0.62\textwidth}
+    \@plaintiff,\\
+    Plaintiff,\\[0.5\baselineskip]
+    v.\\[0.5\baselineskip]
+    \@defendant,\\
+    Defendant.
+  \end{minipage}%
+  \hfill
+  \begin{minipage}[t]{0.31\textwidth}
+    \raggedright
+    \textbf{\@casenumber}
+  \end{minipage}
+  \vspace{\baselineskip}
+  \hrule
+  \vspace{\baselineskip}
+}
+
+\newcommand{\maketitleblock}{%
+  \begin{center}
+    \textbf{\@documenttitle}\par
+  \end{center}
+  \vspace{\baselineskip}
+}
+
+\newcommand{\signatureblock}{%
+  \vspace{2\baselineskip}
+  \noindent Respectfully submitted,\par
+  \vspace{2\baselineskip}
+  \noindent
+  \begin{tabular}{@{}l@{}}
+    \@attorneyname\\
+    \@attorneybar\\
+    \@attorneyfirm\\
+    \@attorneyaddress\\
+    \@attorneycontact
+  \end{tabular}
+}
+
+\newcommand{\certificateofservice}[2]{%
+  \begin{center}
+    \textbf{CERTIFICATE OF SERVICE}
+  \end{center}
+  I certify that on #1, I served a true and correct copy of the foregoing
+  filing on the following persons by [method of service]:
+
+  \begin{itemize}[leftmargin=0.5in]
+    \item #2
+  \end{itemize}
+
+  \vspace{2\baselineskip}
+  \noindent\makebox[2.5in]{\hrulefill}\\
+  \noindent [Name]
+}
+\makeatother
+
+\endinput
