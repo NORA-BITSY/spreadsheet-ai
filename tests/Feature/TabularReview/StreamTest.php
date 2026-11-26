@@ -63,4 +63,45 @@ class StreamTest extends TestCase
     {
         $this->get('/api/reviews/9999/stream')->assertNotFound();
     }
+
+    public function test_stream_rejects_invalid_cols_with_422(): void
+    {
+        $review = $this->review();
+        $colCount = count($review->columns_config ?? []);
+
+        $this->getJson("/api/reviews/{$review->id}/stream?cols=-1")
+            ->assertStatus(422)
+            ->assertJson(['message' => 'Invalid cols parameter.']);
+
+        $this->getJson("/api/reviews/{$review->id}/stream?cols=abc")
+            ->assertStatus(422)
+            ->assertJson(['message' => 'Invalid cols parameter.']);
+
+        $this->getJson("/api/reviews/{$review->id}/stream?cols={$colCount}")
+            ->assertStatus(422)
+            ->assertJson(['message' => 'Invalid cols parameter.']);
+
+        $this->getJson("/api/reviews/{$review->id}/stream?cols=0,,1")
+            ->assertStatus(422)
+            ->assertJson(['message' => 'Invalid cols parameter.']);
+    }
+
+    public function test_stream_deduplicates_cols_filter(): void
+    {
+        $review = $this->review();
+
+        $body = $this->get("/api/reviews/{$review->id}/stream?cols=0,0,0")->streamedContent();
+
+        // 14 returns rows, deduplicated single column → 14 cell events.
+        $this->assertSame(14, substr_count($body, 'event: cell'));
+    }
+
+    public function test_stream_rate_limit_enforces_429_when_configured_low(): void
+    {
+        config(['tabular.rate_limit_stream' => 1]);
+        $review = $this->review();
+
+        $this->get("/api/reviews/{$review->id}/stream?cols=0")->assertOk();
+        $this->getJson("/api/reviews/{$review->id}/stream?cols=0")->assertStatus(429);
+    }
 }

@@ -11,11 +11,29 @@ function readVar(styles: CSSStyleDeclaration, name: string, fallback: string): s
     return v === '' ? fallback : v;
 }
 
+export interface GlideThemeBundle {
+    theme: Partial<Theme>;
+    aiHeaderColor: string;
+}
+
+/**
+ * Resolve the `--ai` CSS token to a concrete color string for Canvas 2D
+ * (`themeOverride.textHeader` cannot use `var(--ai)`).
+ */
+export function resolveAiColor(): string {
+    const fallback = '#8b5cf6';
+    if (typeof window !== 'undefined' && typeof getComputedStyle === 'function') {
+        const s = getComputedStyle(document.documentElement);
+        return readVar(s, '--ai', fallback);
+    }
+    return fallback;
+}
+
 /**
  * Build a partial Glide theme from the document's resolved CSS tokens.
  * Safe in non-DOM environments (returns sensible dark defaults).
  */
-export function buildGlideTheme(): Partial<Theme> {
+export function buildGlideTheme(): Partial<Theme> & { aiHeaderColor?: string } {
     const dark = {
         bg: '#0a0a0b',
         bgElevated: '#111113',
@@ -25,6 +43,7 @@ export function buildGlideTheme(): Partial<Theme> {
         textSecondary: '#a1a1a8',
         textTertiary: '#6e6e76',
         accent: '#8b5cf6',
+        ai: '#8b5cf6',
     };
 
     let t = dark;
@@ -39,6 +58,7 @@ export function buildGlideTheme(): Partial<Theme> {
             textSecondary: readVar(s, '--text-secondary', dark.textSecondary),
             textTertiary: readVar(s, '--text-tertiary', dark.textTertiary),
             accent: readVar(s, '--accent', dark.accent),
+            ai: readVar(s, '--ai', dark.ai),
         };
     }
 
@@ -65,6 +85,7 @@ export function buildGlideTheme(): Partial<Theme> {
         horizontalBorderColor: t.border,
         drilldownBorder: t.border,
         linkColor: t.accent,
+        aiHeaderColor: t.ai,
         cellHorizontalPadding: 8,
         cellVerticalPadding: 3,
         headerFontStyle: '600 12px',

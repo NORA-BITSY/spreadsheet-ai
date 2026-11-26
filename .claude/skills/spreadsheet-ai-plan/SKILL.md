@@ -8,8 +8,8 @@ description: Resume or continue the spreadsheet-ai Tabular Review demo (Laravel 
 You are building a **functioning single-page demo of an agentic spreadsheet**
 ("Tabular Review"): rows = e-commerce entities, columns = LLM prompts, cells =
 AI values with confidence flag + citation. Stack: Laravel 13 + SQLite +
-`laravel/ai`, React 19 + Vite + Tailwind v4 + Glide Data Grid, synchronous SSE,
-Mock-default + Live LLM toggle.
+`laravel/ai` (default Anthropic `claude-haiku-4-5`), React 19 + Vite + Tailwind v4 + Glide Data Grid, synchronous SSE,
+Mock-default (`TABULAR_AI_MOCK=true`) + server-controlled Live mode via `.env`.
 
 ## Start here (read in order, every time)
 1. `AGENTS.md` — operating instructions + the branch/PR/Copilot loop.
@@ -18,12 +18,13 @@ Mock-default + Live LLM toggle.
 4. `docs/LESSON.md` — non-obvious facts/fixes (incl. `laravel/ai` option-forwarding gotcha, extractor upsert race, prototype renderer bugs).
 5. `docs/RULES.md` — binding implementation/security/testing/review/UI rules.
 
-## External references (read, don't re-derive)
-- Article: `%USERPROFILE%\Downloads\medium\SpreadsheetAi\article-bozza-italiano.md`
-- Design prototype (pixel reference + presets + 17 renderers + CSS tokens): `%USERPROFILE%\Downloads\SpreadsheetAi\tabular-review-demo\project\`
-- Backend patterns to copy: `%USERPROFILE%\Documents\DocLore\Visual Basic\Ai\AskMyDocs`
-- Governance template: `%USERPROFILE%\Documents\DocLore\Visual Basic\Ai\product_image_discovery_admin`
-- Screenshots for README: `resources/Tabular-Review-Banner.png`, `…-Ai-suggested.png`, `…-Prompt-Column.png`
+## External references (historical / author-local — codebase is now self-contained)
+- Screenshots for README (in-repo): `resources/Tabular-Review-Banner.png`, `…-Ai-suggested.png`, `…-Prompt-Column.png`
+- Historical Windows paths used during initial M0–M7 scaffolding (no longer required):
+  - Article: `%USERPROFILE%\Downloads\medium\SpreadsheetAi\article-bozza-italiano.md`
+  - Design prototype: `%USERPROFILE%\Downloads\SpreadsheetAi\tabular-review-demo\project\`
+  - Backend patterns: `%USERPROFILE%\Documents\DocLore\Visual Basic\Ai\AskMyDocs`
+  - Governance template: `%USERPROFILE%\Documents\DocLore\Visual Basic\Ai\product_image_discovery_admin`
 
 ## Procedure
 1. Read current state (above). Scope to the current macro task / subtask from `docs/plan.md` §3.
@@ -39,15 +40,16 @@ Mock-default + Live LLM toggle.
 5. After each meaningful step: update `docs/PROGRESS.md`. On any non-obvious learning (incl. Copilot feedback): update `docs/LESSON.md`.
 
 ## Macro task order
-M0 governance (done first) → M1 Laravel foundation + DB + seeders + ai config →
-M2 backend engine (FormatType, extractor, json_path, SSE) → M3 frontend shell →
-M4 Glide grid + 17 renderers + SSE consumer → M5 column editor + AI Suggest +
-bulk + citation panel → M6 presets/workflows/polish/export → M7 CI + WOW README +
-knowledge consolidation + tag `v0.1.0` & GitHub release.
+- **Completed (`v0.1.0` released):** M0 governance → M1 Laravel foundation + DB + seeders + ai config →
+  M2 backend engine (FormatType, extractor, json_path, SSE) → M3 frontend shell →
+  M4 Glide grid + 17 renderers + SSE consumer → M5 column editor + AI Suggest +
+  bulk + citation panel → M6 presets/workflows/polish/export → M7 CI + WOW README +
+  knowledge consolidation + tag `v0.1.0` & GitHub release.
+- **In progress:** M9 production-readiness hardening (docs alignment, security/rate-limit/operational guidance, env cleanup).
 
 ## Hard rules (quick)
 - Controllers use `config()`, never `env()`. Never leak provider errors/secrets.
 - Atomic cell upsert keyed `(review_id,row_id,column_index)`; encode JSON with `JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE`, degrade to red on failure.
 - `url` cells: `http:`/`https:` only. CSV export: neutralize `= + - @`.
-- Windows/Herd PHP 8.4 (satisfies `^8.3`), not XAMPP; phpunit via `npm run phpunit` wrapper. Vitest `pool: threads`.
-- Final task: fold `docs/LESSON.md` into rules/skills/AGENTS.md/CLAUDE.md before tagging the release.
+- Windows/Herd PHP 8.4 (satisfies `^8.4`), not XAMPP; phpunit via `npm run phpunit` wrapper. Vitest `pool: threads`.
+- Ongoing knowledge consolidation: M7 completed the initial fold of `docs/LESSON.md` into `docs/RULES.md` and `v0.1.0` release; continue folding new learnings back into rules/skills/`AGENTS.md`/`CLAUDE.md` as follow-up milestones complete.

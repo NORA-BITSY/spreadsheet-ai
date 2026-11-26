@@ -79,6 +79,19 @@ export function CellSidePanel({
     const [promptOpen, setPromptOpen] = useState(false);
     const [copied, setCopied] = useState(false);
     const copyTimerRef = useRef<number | null>(null);
+    const prevFocusRef = useRef<HTMLElement | null>(null);
+    const wasOpenRef = useRef(false);
+
+    const isVisible = open && selection != null;
+    useEffect(() => {
+        if (isVisible && !wasOpenRef.current) {
+            prevFocusRef.current = document.activeElement as HTMLElement | null;
+        } else if (!isVisible && wasOpenRef.current) {
+            prevFocusRef.current?.focus?.();
+            prevFocusRef.current = null;
+        }
+        wasOpenRef.current = isVisible;
+    }, [isVisible]);
 
     // Close on Escape; guard so the effect only attaches when the panel is open.
     useEffect(() => {

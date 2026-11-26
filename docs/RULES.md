@@ -5,13 +5,15 @@ Binding rules. Adapted from `product_image_discovery_admin/docs/RULES.md`.
 ## Source of truth
 - Canonical plan: `docs/plan.md`.
 - Live progress: `docs/PROGRESS.md`. Lessons: `docs/LESSON.md`.
-- Pixel/design reference: `%USERPROFILE%\Downloads\SpreadsheetAi\tabular-review-demo\project\` and `resources/Tabular-Review-Banner.png`.
-- Backend pattern reference: `%USERPROFILE%\Documents\DocLore\Visual Basic\Ai\AskMyDocs`.
-- Narrative/feature reference: `%USERPROFILE%\Downloads\medium\SpreadsheetAi\article-bozza-italiano.md`.
+- Pixel/design reference: `resources/Tabular-Review-Banner.png`.
+- Historical / author-local references (Windows paths used during initial scaffolding; no longer required now that the codebase is self-contained):
+  - Prototype: `%USERPROFILE%\Downloads\SpreadsheetAi\tabular-review-demo\project\`
+  - Backend patterns: `%USERPROFILE%\Documents\DocLore\Visual Basic\Ai\AskMyDocs`
+  - Narrative/feature reference: `%USERPROFILE%\Downloads\medium\SpreadsheetAi\article-bozza-italiano.md`
 
 ## Implementation defaults
 - Laravel 13, PHP `^8.4` (local Windows runtime: Herd `php84` at `%USERPROFILE%\.config\herd\bin\php84\php.exe`). SQLite (`database/database.sqlite`). Queue `sync`.
-- LLM via `laravel/ai` (`>=0.6,<0.6.8` — upper bound pinned at scaffolding time; verify no breaking changes before M2 and widen if safe). Default provider Anthropic, model `claude-haiku-4.5`. `AI_MOCK=true` by default.
+- LLM via `laravel/ai` (`>=0.6,<0.6.8`, verified through M2–M7). Default provider Anthropic, model `claude-haiku-4-5`. `TABULAR_AI_MOCK=true` by default (server-controlled via `.env`).
 - Frontend: Blade shell + Vite + React 19 + Tailwind v4 + Glide Data Grid + TanStack Query.
 - API under `/api/...`. SSE stream is synchronous (no Redis/Horizon).
 - Rows are real e-commerce entities (returns/orders/articles/campaigns), seeded from the 5 presets.
@@ -49,7 +51,7 @@ npm run e2e            # Playwright (required for any UI/UX task)
 ```
 - Pure-code tasks: PHPUnit/Vitest only. UI/UX tasks: Playwright scenarios for **every** interaction.
 - Playwright: exact label selectors; clean up created rows in `finally`; don't assume globally-unique rows under parallel projects.
-- Vitest CI: `LARAVEL_BYPASS_ENV_CHECK=1`; validate lockfile with `npx npm@10 ci --dry-run`.
+- Vitest CI: `LARAVEL_BYPASS_ENV_CHECK=1`; CI installs frontend deps with `npm install --no-audit --no-fund` (see Hard-won engineering rules below).
 - If a tool is blocked (sandbox/network), record the exact blocker in `docs/PROGRESS.md`; do not silently skip.
 
 ## Review rules (two-phase: local then GitHub)

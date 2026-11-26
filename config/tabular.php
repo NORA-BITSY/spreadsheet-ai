@@ -23,4 +23,7 @@ return [
     'max_tokens' => 1200,
     'temperature' => 0.1,
 
+    'rate_limit_api' => (int) env('TABULAR_RATE_LIMIT_API', 120),
+    'rate_limit_stream' => (int) env('TABULAR_RATE_LIMIT_STREAM', 30),
+
 ];

@@ -9,12 +9,14 @@ describe('escapeCsvField — formula neutralisation (CSV injection)', () => {
         ['@x', "'@x"],
         ['\tTAB', "'\tTAB"],
         ['\rCR', "'\rCR"],
+        [' =HYPERLINK("http://evil")', '"\' =HYPERLINK(""http://evil"")"'],
+        ['  +1+1', "'  +1+1"],
+        ['\n=CMD|calc', '"\'\n=CMD|calc"'],
+        ['\t=1', "'\t=1"],
     ])('prefixes a single quote to %j', (input, expected) => {
-        // CR makes it quoted too; assert the quote is present at the start.
         const out = escapeCsvField(input);
         expect(out.startsWith("'") || out.startsWith('"\'')).toBe(true);
-        // Direct comparison for the non-quoted cases.
-        if (!/[",\n\r]/.test(expected.replace(/^'/, ''))) {
+        if (input !== '\rCR') {
             expect(out).toBe(expected);
         }
     });

@@ -116,14 +116,15 @@ describe('ColumnEditor interactions', () => {
         expect((screen.getByLabelText(/Enum values/i) as HTMLInputElement).value).toBe('A, B');
     });
 
-    it('Delete (edit mode) confirms then calls onDelete', () => {
-        const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    it('Delete (edit mode) uses inline two-step confirmation before calling onDelete', () => {
         const column: AiColumn = { index: 3, name: 'X', prompt: 'p', format: 'text' };
         const { onDelete } = renderEditor({ mode: 'edit', column });
         fireEvent.click(screen.getByRole('button', { name: /Delete column/i }));
-        expect(confirmSpy).toHaveBeenCalled();
+        expect(onDelete).not.toHaveBeenCalled();
+        const confirmBtn = screen.getByTestId('confirm-delete-column');
+        expect(confirmBtn).toBeInTheDocument();
+        fireEvent.click(confirmBtn);
         expect(onDelete).toHaveBeenCalledWith(3);
-        confirmSpy.mockRestore();
     });
 
     it('does not render Delete in new mode', () => {

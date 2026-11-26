@@ -41,7 +41,6 @@ function lastColumnIndex(review: ReviewResponse): number {
 export function TabularPage() {
     const [theme, setTheme] = useState<Theme>('dark');
     const [preset, setPreset] = useState<string>(DEFAULT_PRESET);
-    const [liveMode, setLiveMode] = useState(false);
     const [themeVersion, setThemeVersion] = useState(0);
 
     // Column editor drawer.
@@ -86,6 +85,17 @@ export function TabularPage() {
 
     const stats = useMemo(() => computeHeroStats(rows, aiColumns), [rows, aiColumns]);
 
+    const onStreamError = useCallback(
+        (message: string) => {
+            toast.push({
+                title: 'Stream interrupted',
+                body: message,
+                kind: 'error',
+            });
+        },
+        [toast],
+    );
+
     const { running, progress, runAll, runColumns, stop } = useSseGeneration({
         reviewId,
         rows,
@@ -93,6 +103,7 @@ export function TabularPage() {
         store: sharedCellStore,
         gridRef,
         baseColumnCount: baseColumns.length,
+        onError: onStreamError,
     });
 
     const addColumn = useAddColumn(preset, reviewId);
@@ -120,10 +131,13 @@ export function TabularPage() {
 
     const handleEditorSubmit = useCallback(
         (payload: ColumnInput, mode: ColumnEditorMode, index?: number) => {
+            // Stop any active SSE stream before mutating columns so stale events
+            // cannot write into reindexed columns.
+            stop();
             // Keep the drawer open if the mutation fails (e.g. validation), so the
             // user doesn't lose their input; close only on success.
             const onError = () =>
-                toast.push({ title: 'Salvataggio fallito', body: 'Controlla i campi e riprova.' });
+                toast.push({ title: 'Salvataggio fallito', body: 'Controlla i campi e riprova.', kind: 'error' });
 
             if (mode === 'edit' && index != null) {
                 updateColumn.mutate(
@@ -150,11 +164,13 @@ export function TabularPage() {
                 });
             }
         },
-        [addColumn, updateColumn, runColumns, toast],
+        [addColumn, updateColumn, runColumns, stop, toast],
     );
 
     const handleEditorDelete = useCallback(
         (index: number) => {
+            // Stop any active SSE stream before deleting/reindexing columns.
+            stop();
             deleteColumn.mutate(index, {
                 onSuccess: () => {
                     toast.push({ title: 'Colonna eliminata', body: `col ${index}` });
@@ -167,15 +183,20 @@ export function TabularPage() {
                 },
                 // Keep the editor open + inform the user if the delete fails.
                 onError: () =>
-                    toast.push({ title: 'Eliminazione fallita', body: `Impossibile eliminare la colonna ${index}.` }),
+                    toast.push({
+                        title: 'Eliminazione fallita',
+                        body: `Impossibile eliminare la colonna ${index}.`,
+                        kind: 'error',
+                    }),
             });
         },
-        [deleteColumn, toast],
+        [deleteColumn, stop, toast],
     );
 
     // ---- AI Suggest ---------------------------------------------------
     const onPickSuggestion = useCallback(
         (s: Suggestion) => {
+            stop();
             addColumn.mutate(
                 {
                     name: s.name,
@@ -188,10 +209,16 @@ export function TabularPage() {
                         runColumns([lastColumnIndex(review)]);
                         toast.push({ title: 'AI Suggest', body: `Colonna "${s.name}" aggiunta` });
                     },
+                    onError: () =>
+                        toast.push({
+                            title: 'AI Suggest fallito',
+                            body: `Impossibile aggiungere "${s.name}". Riprova.`,
+                            kind: 'error',
+                        }),
                 },
             );
         },
-        [addColumn, runColumns, toast],
+        [addColumn, runColumns, stop, toast],
     );
 
     // ---- CSV export ---------------------------------------------------
@@ -279,14 +306,24 @@ export function TabularPage() {
                     onPickSuggestion={onPickSuggestion}
                     running={running}
                     progress={progress}
-                    liveMode={liveMode}
-                    onToggleLiveMode={() => setLiveMode((v) => !v)}
+                    aiMode={data?.ai_mode}
                     suggestions={suggestQuery.data?.suggestions ?? []}
                     suggestionsLoading={suggestQuery.isPending}
+                    suggestionsError={suggestQuery.isError}
+                    onRetrySuggestions={() => void suggestQuery.refetch()}
                 />
                 {reviewQuery.isError ? (
                     <div className="empty" role="alert">
-                        Impossibile caricare il preset. Verifica che il database sia seeded.
+                        <p style={{ margin: '0 0 12px' }}>
+                            Impossibile caricare il preset. Verifica che il database sia seeded.
+                        </p>
+                        <button
+                            type="button"
+                            className="btn primary"
+                            onClick={() => void reviewQuery.refetch()}
+                        >
+                            Retry
+                        </button>
                     </div>
                 ) : (
                     <AgenticGrid

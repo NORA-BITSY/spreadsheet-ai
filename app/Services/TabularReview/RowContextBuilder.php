@@ -30,17 +30,30 @@ class RowContextBuilder
     }
 
     /**
+     * Maximum byte length of serialized row context sent to the LLM.
+     */
+    public const MAX_CONTEXT_BYTES = 32768;
+
+    /**
      * The JSON context string handed to the LLM.
      *
      * @param  array<string, mixed>  $row
      */
-    public function contextJson(string $presetKey, array $row): string
+    public function contextJson(string $presetKey, array $row, int $maxBytes = self::MAX_CONTEXT_BYTES): string
     {
         $encoded = json_encode(
             $this->contextArray($presetKey, $row),
             JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE | JSON_PARTIAL_OUTPUT_ON_ERROR,
         );
 
-        return $encoded === false ? '{}' : $encoded;
+        if ($encoded === false) {
+            return '{}';
+        }
+
+        if ($maxBytes > 0 && strlen($encoded) > $maxBytes) {
+            return mb_strcut($encoded, 0, $maxBytes, 'UTF-8').'...[truncated]';
+        }
+
+        return $encoded;
     }
 }

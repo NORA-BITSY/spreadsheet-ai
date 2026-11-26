@@ -3,7 +3,7 @@
 > Canonical, cross-session plan. If a session is interrupted, read this file +
 > `docs/PROGRESS.md` + `docs/LESSON.md` + `AGENTS.md` before doing anything.
 >
-> Last updated: 2026-05-26
+> Last updated: 2026-11-26
 
 ---
 
@@ -16,16 +16,16 @@ flag + citation. Click a column → edit its prompt/format → regenerate. Prese
 chips launch cooked scenarios. An "✨ AI Suggest" button proposes columns.
 Cells stream in live (skeleton → value) cell-by-cell.
 
-Inspiration & sources (read these, do not re-derive):
+Inspiration & sources (historical / author-local — used during initial M0–M7 scaffolding; no longer required now that the codebase is self-contained):
 - Article (the narrative + the 7 laws + 17 formats): `%USERPROFILE%\Downloads\medium\SpreadsheetAi\article-bozza-italiano.md`
 - Design prototype (pixel reference, presets, renderers, CSS tokens): `%USERPROFILE%\Downloads\SpreadsheetAi\tabular-review-demo\project\`
-- Real production patterns to copy (backend): `%USERPROFILE%\Documents\DocLore\Visual Basic\Ai\AskMyDocs` (`app/Support/TabularReview/FormatType.php`, `app/Services/TabularReview/TabularReviewExtractor.php`, `app/Ai/AiManager.php`).
+- Real production patterns (backend): `%USERPROFILE%\Documents\DocLore\Visual Basic\Ai\AskMyDocs` (`app/Support/TabularReview/FormatType.php`, `app/Services/TabularReview/TabularReviewExtractor.php`, `app/Ai/AiManager.php`).
 - Governance scaffolding template: `%USERPROFILE%\Documents\DocLore\Visual Basic\Ai\product_image_discovery_admin` (`AGENTS.md`, `docs/RULES.md`, `docs/LESSON.md`, `docs/PROGRESS.md`, `skills/`, `.github/workflows/ci.yml`).
 
 ### Confirmed architecture decisions (locked 2026-05-26)
 1. **DB = SQLite** (`database/database.sqlite`). Rows are e-commerce entities from seeders; no embeddings / pgvector needed (LLM context is the DB row itself, not RAG chunks).
 2. **Streaming = synchronous SSE, no Redis/Horizon.** The SSE endpoint iterates rows, calls the extractor, and echoes `cell` events as they land. Zero extra infra.
-3. **LLM = Mock mode by default + a Live toggle.** Mock returns the cooked preset cells (zero cost, works offline). Live calls real `laravel/ai` (Anthropic `claude-haiku-4.5` default, provider configurable). Demo runs out-of-the-box with no API key.
+3. **LLM = Mock mode by default (`TABULAR_AI_MOCK=true`) + server-controlled Live mode via `.env`.** Mock returns the cooked preset cells (zero cost, works offline). Live calls real `laravel/ai` (Anthropic `claude-haiku-4-5` default, provider configurable). Demo runs out-of-the-box with no API key.
 
 ### Stack
 - Backend: **Laravel 13**, PHP `^8.4`, SQLite, `laravel/ai` (`>=0.6,<0.6.8`), queue `sync`.
@@ -78,7 +78,7 @@ AskMyDocs code. These become guardrails or backlog items in the tasks below.
 - CSV/any export must neutralize spreadsheet formulas (`=,+,-,@`).
 - Source/`url` cells: restrict to `http:`/`https:` before any `window.open`.
 - Playwright on Windows: Herd PHP, exact label selectors, clean up created rows in `finally`, don't assume globally-unique rows under parallel projects.
-- Vitest in CI: `pool: 'threads'`, set `LARAVEL_BYPASS_ENV_CHECK=1`, validate lockfile with `npx npm@10 ci --dry-run`.
+- Vitest in CI: `pool: 'threads'`, set `LARAVEL_BYPASS_ENV_CHECK=1`. CI installs frontend deps with `npm install --no-audit --no-fund` (Windows-generated lockfile omits Linux optional native deps).
 - Controllers must not call `env()`; read `config()`.
 
 ---
@@ -121,7 +121,7 @@ Objective / Implementation / Guardrails (tests).
   - Guardrails [T]: migration tests; unique-constraint test.
 - **M1.4 [BE]** `EcommerceDemoSeeder` (gated to local/testing) loading the exact rows from the 5 presets in `data.jsx` so Mock mode is pixel-faithful. `BuiltinWorkflowSeeder` for the 5 cooked scenarios + 16-format showcase.
   - Guardrails [T]: seeder idempotent; row counts match presets.
-- **M1.5 [BE]** `config/ai.php` + Anthropic provider wiring for `laravel/ai`; default `claude-haiku-4.5`; `AI_MOCK=true` default.
+- **M1.5 [BE]** `config/ai.php` + Anthropic provider wiring for `laravel/ai`; default `claude-haiku-4-5`; `TABULAR_AI_MOCK=true` default.
   - Guardrails [T]: config test; verify max_tokens/temperature forwarded (§1.C finding 14) via a faked HTTP assertion.
 
 ### M2 — Backend Tabular engine  ·  branch `task/m2-engine`
@@ -196,4 +196,4 @@ Objective / Implementation / Guardrails (tests).
 ---
 
 ## 5. Quick status pointer
-See `docs/PROGRESS.md` for the live "where am I" log. Current: **M0 in progress** (governance scaffolding being written).
+See `docs/PROGRESS.md` for the live "where am I" log. Current: **M0–M7 complete** (`v0.1.0` released); **M9 production-readiness hardening in progress** on `task/m9-production-readiness`.

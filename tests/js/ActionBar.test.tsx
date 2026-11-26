@@ -15,8 +15,6 @@ function renderBar(overrides: Partial<Parameters<typeof ActionBar>[0]> = {}) {
         onPickSuggestion: noop,
         running: false,
         progress: { done: 0, total: 0 } as RunProgress,
-        liveMode: false,
-        onToggleLiveMode: noop,
         suggestions: [] as Suggestion[],
         ...overrides,
     };
@@ -34,11 +32,19 @@ describe('ActionBar (idle)', () => {
         expect(screen.getByRole('button', { name: /Run all/i })).toBeInTheDocument();
     });
 
-    it('defaults the LLM toggle to Mock mode · no API calls', () => {
+    it('renders read-only Mock mode badge by default', () => {
         renderBar();
-        const toggle = screen.getByRole('button', { name: /Mock mode/i });
-        expect(toggle).toHaveAttribute('aria-pressed', 'false');
+        const badge = screen.getByRole('status', { name: /Mock mode/i });
+        expect(badge).toHaveAttribute('data-mode', 'mock');
+        expect(badge.getAttribute('title')).toContain('TABULAR_AI_MOCK');
         expect(screen.getByText('no API calls')).toBeInTheDocument();
+    });
+
+    it('renders read-only Live LLM badge with server model when aiMode.mock is false', () => {
+        renderBar({ aiMode: { mock: false, provider: 'anthropic', model: 'claude-sonnet-4' } });
+        const badge = screen.getByRole('status', { name: /Live LLM/i });
+        expect(badge).toHaveAttribute('data-mode', 'live');
+        expect(screen.getByText('claude-sonnet-4')).toBeInTheDocument();
     });
 
     it('fires callbacks for export/share/run/add', () => {

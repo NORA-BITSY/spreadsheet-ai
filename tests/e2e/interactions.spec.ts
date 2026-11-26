@@ -20,13 +20,54 @@ async function filledCount(page: Page): Promise<number> {
     return Number.parseInt(txt ?? '0', 10);
 }
 
-/** Run all and wait for the returns grid to fully fill (14×8 = 112 cells). */
+async function expectedCellCount(page: Page): Promise<number> {
+    const rows = await page.locator(`${MIRROR} tbody tr`).count();
+    const cols = await page.locator(`${MIRROR} thead th[data-format]`).count();
+    return rows * cols;
+}
+
+/** Run all and wait for the returns grid to fully fill based on active dimensions. */
 async function runAllReturns(page: Page): Promise<void> {
     await page.goto('/');
     await expect(page.locator(MIRROR)).toBeAttached();
+    await expect(page.locator(`${MIRROR} tbody tr`).first()).toBeAttached();
+    const expected = await expectedCellCount(page);
+    expect(expected).toBeGreaterThan(0);
     await page.getByRole('button', { name: /Run all/i }).click();
-    await expect.poll(() => filledCount(page), { timeout: 30_000 }).toBe(112);
+    await expect.poll(() => filledCount(page), { timeout: 30_000 }).toBe(expected);
     await expect(page.getByRole('button', { name: /Run all/i })).toBeVisible();
+}
+
+/** Return the `column_index` of the last AI column currently rendered in the mirror. */
+async function lastAiColumnIndex(page: Page): Promise<number> {
+    const testId = await page
+        .locator(`${MIRROR} thead button[data-testid^="edit-col-"]`)
+        .last()
+        .getAttribute('data-testid');
+    const match = testId?.match(/^edit-col-(\d+)$/);
+    if (!match) {
+        throw new Error(`Could not determine last AI column index from ${testId ?? 'null'}`);
+    }
+    return Number.parseInt(match[1], 10);
+}
+
+/** Delete an AI column by its column_index using the inline confirmation UI. */
+async function deleteColumn(page: Page, colIndex: number): Promise<void> {
+    // Wait for any active SSE stream to finish so the single PHP worker is free.
+    await expect(page.getByRole('button', { name: /Run all/i })).toBeVisible({ timeout: 30_000 });
+    const editBtn = page.getByTestId(`edit-col-${colIndex}`);
+    if ((await editBtn.count()) === 0) return;
+
+    const before = await page.locator(`${MIRROR} thead th[data-format]`).count();
+    await editBtn.dispatchEvent('click');
+    const drawer = page.getByTestId('column-editor');
+    await expect(drawer).toBeVisible();
+    await drawer.getByRole('button', { name: /Delete column/i }).click();
+    await drawer.getByTestId('confirm-delete-column').click();
+    await expect(drawer).toBeHidden();
+    await expect
+        .poll(async () => page.locator(`${MIRROR} thead th[data-format]`).count(), { timeout: 15_000 })
+        .toBe(before - 1);
 }
 
 test.describe('Column editor (M5.1)', () => {
@@ -60,62 +101,129 @@ test.describe('Add / AI Suggest / delete column (M5.2)', () => {
         await runAllReturns(page);
 
         const before = await page.locator(`${MIRROR} thead th[data-format]`).count();
+        let createdIdx: number | null = null;
 
-        await page.getByRole('button', { name: /Add column/i }).click();
-        const drawer = page.getByTestId('column-editor');
-        await expect(drawer).toBeVisible();
-        await drawer.getByLabel('Label').fill('Sentiment cliente');
-        await drawer.getByRole('button', { name: /^Text/i }).click();
-        await drawer.getByLabel('Prompt').fill('Determina il sentiment del cliente dal motivo del reso.');
-        await drawer.getByRole('button', { name: /Save & regenerate/i }).click();
-        await expect(drawer).toBeHidden();
+        try {
+            await page.getByRole('button', { name: /Add column/i }).click();
+            const drawer = page.getByTestId('column-editor');
+            await expect(drawer).toBeVisible();
+            await drawer.getByLabel('Label').fill('Sentiment cliente');
+            await drawer.getByRole('button', { name: /^Text/i }).click();
+            await drawer.getByLabel('Prompt').fill('Determina il sentiment del cliente dal motivo del reso.');
+            await drawer.getByRole('button', { name: /Save & regenerate/i }).click();
+            await expect(drawer).toBeHidden();
 
-        // A new AI column header appears.
-        await expect
-            .poll(async () => page.locator(`${MIRROR} thead th[data-format]`).count(), { timeout: 15_000 })
-            .toBe(before + 1);
+            // A new AI column header appears.
+            await expect
+                .poll(async () => page.locator(`${MIRROR} thead th[data-format]`).count(), { timeout: 15_000 })
+                .toBe(before + 1);
 
-        // Its cells fill (new column index = `before` ordinal among AI cols).
-        const newIdx = before;
-        await expect(page.getByTestId(`cell-RET-1042-${newIdx}`)).not.toHaveText('', { timeout: 30_000 });
+            createdIdx = await lastAiColumnIndex(page);
+            await expect(page.getByTestId(`cell-RET-1042-${createdIdx}`)).not.toHaveText('', {
+                timeout: 30_000,
+            });
+        } finally {
+            if (createdIdx !== null) {
+                await deleteColumn(page, createdIdx);
+            }
+        }
     });
 
     test('AI Suggest → pick a suggestion → new column appears and fills', async ({ page }) => {
         await runAllReturns(page);
 
         const before = await page.locator(`${MIRROR} thead th[data-format]`).count();
+        let createdIdx: number | null = null;
 
-        await page.getByRole('button', { name: /AI Suggest/i }).click();
-        const menu = page.getByRole('menu', { name: /AI suggested columns/i });
-        await expect(menu).toBeVisible();
-        await menu.getByRole('menuitem').first().click();
+        try {
+            await page.getByRole('button', { name: /AI Suggest/i }).click();
+            const menu = page.getByRole('menu', { name: /AI suggested columns/i });
+            await expect(menu).toBeVisible();
+            await menu.getByRole('menuitem').first().click();
 
-        await expect
-            .poll(async () => page.locator(`${MIRROR} thead th[data-format]`).count(), { timeout: 15_000 })
-            .toBe(before + 1);
+            await expect
+                .poll(async () => page.locator(`${MIRROR} thead th[data-format]`).count(), { timeout: 15_000 })
+                .toBe(before + 1);
 
-        const newIdx = before;
-        await expect(page.getByTestId(`cell-RET-1042-${newIdx}`)).not.toHaveText('', { timeout: 30_000 });
+            createdIdx = await lastAiColumnIndex(page);
+            await expect(page.getByTestId(`cell-RET-1042-${createdIdx}`)).not.toHaveText('', {
+                timeout: 30_000,
+            });
+        } finally {
+            if (createdIdx !== null) {
+                await deleteColumn(page, createdIdx);
+            }
+        }
     });
 
-    test('delete a column from the editor → it disappears', async ({ page }) => {
+    test('delete a column from the editor via inline confirmation → it disappears', async ({ page }) => {
         await runAllReturns(page);
 
-        const before = await page.locator(`${MIRROR} thead th[data-format]`).count();
+        const baseline = await page.locator(`${MIRROR} thead th[data-format]`).count();
+        let createdIdx: number | null = null;
 
-        // Auto-accept the confirm() dialog.
-        page.on('dialog', (d) => d.accept());
+        try {
+            // Create a temporary column so deleting it does not mutate seeded columns.
+            await page.getByRole('button', { name: /Add column/i }).click();
+            const drawer = page.getByTestId('column-editor');
+            await expect(drawer).toBeVisible();
+            await drawer.getByLabel('Label').fill('Colonna temporanea');
+            await drawer.getByRole('button', { name: /^Text/i }).click();
+            await drawer.getByLabel('Prompt').fill('Campo temporaneo da eliminare.');
+            await drawer.getByRole('button', { name: /Save & regenerate/i }).click();
+            await expect(drawer).toBeHidden();
 
-        // Delete the last AI column (index = before - 1).
-        const lastIdx = before - 1;
-        await page.getByTestId(`edit-col-${lastIdx}`).dispatchEvent('click');
-        const drawer = page.getByTestId('column-editor');
-        await expect(drawer).toBeVisible();
-        await drawer.getByRole('button', { name: /Delete column/i }).click();
+            await expect
+                .poll(async () => page.locator(`${MIRROR} thead th[data-format]`).count(), { timeout: 15_000 })
+                .toBe(baseline + 1);
 
-        await expect
-            .poll(async () => page.locator(`${MIRROR} thead th[data-format]`).count(), { timeout: 15_000 })
-            .toBe(before - 1);
+            createdIdx = await lastAiColumnIndex(page);
+            await expect(page.getByRole('button', { name: /Run all/i })).toBeVisible({ timeout: 30_000 });
+
+            // Open the editor and delete via the inline confirmation button.
+            await page.getByTestId(`edit-col-${createdIdx}`).dispatchEvent('click');
+            await expect(drawer).toBeVisible();
+            await drawer.getByRole('button', { name: /Delete column/i }).click();
+            await drawer.getByTestId('confirm-delete-column').click();
+            await expect(drawer).toBeHidden();
+
+            await expect
+                .poll(async () => page.locator(`${MIRROR} thead th[data-format]`).count(), { timeout: 15_000 })
+                .toBe(baseline);
+            createdIdx = null;
+        } finally {
+            if (createdIdx !== null) {
+                await deleteColumn(page, createdIdx);
+            }
+        }
+    });
+});
+
+test.describe('Stream cancellation (Stop button)', () => {
+    test('clicking Stop mid-stream halts generation and allows a clean subsequent run', async ({
+        page,
+    }) => {
+        await page.goto('/');
+        await expect(page.locator(MIRROR)).toBeAttached();
+        await expect(page.locator(`${MIRROR} tbody tr`).first()).toBeAttached();
+        const expected = await expectedCellCount(page);
+        expect(expected).toBeGreaterThan(0);
+
+        // Start streaming and immediately click Stop mid-stream.
+        await page.getByRole('button', { name: /Run all/i }).click();
+        const stopBtn = page.getByRole('button', { name: /^Stop$/i });
+        await expect(stopBtn).toBeVisible();
+        await stopBtn.click();
+
+        // Generation halts cleanly: Run all returns and progressbar hides.
+        await expect(page.getByRole('button', { name: /Run all/i })).toBeVisible({ timeout: 10_000 });
+        await expect(page.getByRole('progressbar')).toBeHidden();
+
+        // A subsequent Run all completes cleanly without permanent broken state.
+        await page.getByRole('button', { name: /Run all/i }).click();
+        await expect.poll(() => filledCount(page), { timeout: 30_000 }).toBe(expected);
+        await expect(page.locator(`${MIRROR} td[data-status="generating"]`)).toHaveCount(0);
+        await expect(page.getByRole('button', { name: /Run all/i })).toBeVisible();
     });
 });
 

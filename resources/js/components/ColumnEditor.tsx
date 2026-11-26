@@ -97,9 +97,24 @@ export function ColumnEditor({
     const [prompt, setPrompt] = useState('');
     const [enumValues, setEnumValues] = useState('');
     const [autogenerating, setAutogen] = useState(false);
+    const [confirmDelete, setConfirmDelete] = useState(false);
+
+    // Save focus on open and restore when the drawer closes.
+    const prevFocusRef = useRef<HTMLElement | null>(null);
+    const wasOpenRef = useRef(false);
+    useEffect(() => {
+        if (open && !wasOpenRef.current) {
+            prevFocusRef.current = document.activeElement as HTMLElement | null;
+        } else if (!open && wasOpenRef.current) {
+            prevFocusRef.current?.focus?.();
+            prevFocusRef.current = null;
+        }
+        wasOpenRef.current = open;
+    }, [open]);
 
     // (Re)seed the form whenever the drawer opens or the target column changes.
     useEffect(() => {
+        setConfirmDelete(false);
         if (!open) return;
         if (mode === 'edit' && column) {
             setName(column.name ?? '');
@@ -189,11 +204,9 @@ export function ColumnEditor({
         onSubmit(payload, mode, mode === 'edit' ? column?.index : undefined);
     };
 
-    const handleDelete = () => {
+    const handleConfirmDelete = () => {
         if (mode !== 'edit' || column == null) return;
-        if (typeof window !== 'undefined' && !window.confirm(`Eliminare la colonna "${column.name}"?`)) {
-            return;
-        }
+        setConfirmDelete(false);
         onDelete?.(column.index);
     };
 
@@ -308,14 +321,34 @@ export function ColumnEditor({
 
                 <div className="drawer-foot">
                     {mode === 'edit' && (
-                        <button
-                            className="btn sm danger"
-                            type="button"
-                            onClick={handleDelete}
-                            style={{ marginRight: 'auto' }}
-                        >
-                            Delete column
-                        </button>
+                        confirmDelete ? (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginRight: 'auto' }}>
+                                <button
+                                    className="btn sm danger"
+                                    type="button"
+                                    data-testid="confirm-delete-column"
+                                    onClick={handleConfirmDelete}
+                                >
+                                    Confirm delete
+                                </button>
+                                <button
+                                    className="btn sm ghost"
+                                    type="button"
+                                    onClick={() => setConfirmDelete(false)}
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        ) : (
+                            <button
+                                className="btn sm danger"
+                                type="button"
+                                onClick={() => setConfirmDelete(true)}
+                                style={{ marginRight: 'auto' }}
+                            >
+                                Delete column
+                            </button>
+                        )
                     )}
                     {validationError !== null && (
                         <span className="tertiary" role="alert" style={{ fontSize: 11, color: 'var(--status-failed)', marginRight: 8 }}>

@@ -12,6 +12,36 @@ export default defineConfig({
         react(),
         tailwindcss(),
     ],
+    build: {
+        rolldownOptions: {
+            output: {
+                codeSplitting: {
+                    groups: [
+                        {
+                            name: 'glide',
+                            test: /node_modules[\\/]@glideapps/,
+                            priority: 20,
+                        },
+                        {
+                            name: 'react-vendor',
+                            test: /node_modules[\\/](react|react-dom|scheduler)/,
+                            priority: 15,
+                        },
+                        {
+                            name: 'query-vendor',
+                            test: /node_modules[\\/]@tanstack/,
+                            priority: 10,
+                        },
+                        {
+                            name: 'vendor',
+                            test: /node_modules/,
+                            priority: 5,
+                        },
+                    ],
+                },
+            },
+        },
+    },
     server: {
         watch: {
             ignored: ['**/storage/framework/views/**'],

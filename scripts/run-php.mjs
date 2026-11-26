@@ -4,16 +4,19 @@
 // Resolution order: env PHP_BINARY -> Herd php84 under USERPROFILE -> bare `php`.
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
+import path from 'node:path';
 
 function resolvePhp() {
     if (process.env.PHP_BINARY && existsSync(process.env.PHP_BINARY)) {
         return process.env.PHP_BINARY;
     }
-    const home = process.env.USERPROFILE || process.env.HOME || '';
-    if (home) {
-        const herd = `${home}\\.config\\herd\\bin\\php84\\php.exe`;
-        if (existsSync(herd)) {
-            return herd;
+    if (process.platform === 'win32') {
+        const home = process.env.USERPROFILE || process.env.HOME || '';
+        if (home) {
+            const herd = path.join(home, '.config', 'herd', 'bin', 'php84', 'php.exe');
+            if (existsSync(herd)) {
+                return herd;
+            }
         }
     }
     return 'php';

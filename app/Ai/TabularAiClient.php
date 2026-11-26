@@ -6,18 +6,15 @@ namespace App\Ai;
 
 use Illuminate\Support\Facades\Log;
 
-use function Laravel\Ai\agent;
-
 /**
  * Thin wrapper around the `laravel/ai` SDK so the rest of the codebase never
  * touches the SDK directly (single seam → trivial to fake / swap).
  *
  * `complete()` issues one text generation and returns the raw `->text`.
  *
- * NOTE: `prompt()` does not accept temperature / max_tokens — the SDK reads
- * those from the agent instance / provider config defaults. We rely on the
- * provider defaults (documented in docs/LESSON). Provider + model come from
- * `config('tabular.*')` so callers stay env()-free.
+ * Provider, model, max_tokens, and temperature come from `config('tabular.*')`
+ * so callers stay env()-free. `TabularAnonymousAgent` exposes `maxTokens()`
+ * and `temperature()` for `TextGenerationOptions::forAgent()`.
  *
  * SECURITY: any provider throwable is caught and re-thrown as {@see
  * AiException} with a GENERIC message. The real message is logged here, never
@@ -25,10 +22,19 @@ use function Laravel\Ai\agent;
  */
 class TabularAiClient
 {
+    public function makeAgent(string $system): TabularAnonymousAgent
+    {
+        return new TabularAnonymousAgent(
+            instructions: $system,
+            maxTokensValue: (int) config('tabular.max_tokens', 1200),
+            temperatureValue: (float) config('tabular.temperature', 0.1),
+        );
+    }
+
     public function complete(string $system, string $user): string
     {
         try {
-            return agent($system)
+            return $this->makeAgent($system)
                 ->prompt(
                     $user,
                     provider: config('tabular.provider'),

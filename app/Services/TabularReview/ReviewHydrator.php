@@ -7,6 +7,7 @@ namespace App\Services\TabularReview;
 use App\Models\TabularCell;
 use App\Models\TabularReview;
 use App\Support\TabularReview\PresetData;
+use Illuminate\Database\UniqueConstraintViolationException;
 
 /**
  * Find-or-create the {@see TabularReview} for a preset and build the JSON
@@ -35,13 +36,20 @@ class ReviewHydrator
             return $review;
         }
 
-        return TabularReview::query()->create([
-            'tenant_id' => 'demo',
-            'preset_key' => $presetKey,
-            'title' => (string) ($preset['label'] ?? $presetKey),
-            'row_source' => (string) ($preset['row_source'] ?? ''),
-            'columns_config' => PresetData::columnsConfig($preset),
-        ]);
+        try {
+            return TabularReview::query()->create([
+                'tenant_id' => 'demo',
+                'preset_key' => $presetKey,
+                'title' => (string) ($preset['label'] ?? $presetKey),
+                'row_source' => (string) ($preset['row_source'] ?? ''),
+                'columns_config' => PresetData::columnsConfig($preset),
+            ]);
+        } catch (UniqueConstraintViolationException) {
+            return TabularReview::query()
+                ->where('tenant_id', 'demo')
+                ->where('preset_key', $presetKey)
+                ->firstOrFail();
+        }
     }
 
     /**
@@ -86,6 +94,11 @@ class ReviewHydrator
             'rows' => $rows,
             'cells' => $cells,
             'suggestions_available' => true,
+            'ai_mode' => [
+                'mock' => (bool) config('tabular.mock', true),
+                'provider' => (string) config('tabular.provider', 'anthropic'),
+                'model' => (string) config('tabular.model', 'claude-haiku-4-5'),
+            ],
         ];
     }
 }

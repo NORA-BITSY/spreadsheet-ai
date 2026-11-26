@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+    cellDisplayText,
     citationCount,
     citationText,
     detectJsonPathType,
     deterministicHue,
+    formatRating,
     isSafeUrl,
     normaliseFlag,
     parsePercent,
@@ -121,5 +123,13 @@ describe('valueToText / truncate / flag / citations', () => {
         expect(citationText([{ quote: 'fonte X' }])).toBe('fonte X');
         expect(citationText(['plain'])).toBe('plain');
         expect(citationText([])).toBe('');
+    });
+    it('rounds and clamps ratings consistently across formatRating and cellDisplayText', () => {
+        expect(formatRating(3.7)).toBe('4/5');
+        expect(formatRating(-2)).toBe('0/5');
+        expect(formatRating(9)).toBe('5/5');
+        expect(formatRating('not-a-number')).toBe('—');
+        expect(cellDisplayText({ status: 'ready', content: { summary: 3.7 } }, 'rating')).toBe('4/5');
+        expect(cellDisplayText({ status: 'ready', content: { summary: 'bad' } }, 'rating')).toBe('—');
     });
 });

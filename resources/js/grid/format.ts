@@ -132,6 +132,23 @@ export function valueToText(value: unknown): string {
 }
 
 /**
+ * Parse a rating into an integer clamped to [0, 5] using Math.round, or `null`
+ * when the input is not a finite number. Shared by canvas, copyData, mirror,
+ * and CSV export so ratings never drift across surfaces.
+ */
+export function parseRating(raw: unknown): number | null {
+    const n = parsePercent(raw);
+    if (n == null) return null;
+    return Math.max(0, Math.min(5, Math.round(n)));
+}
+
+/** Format a rating as `n/5`, or `—` when invalid. */
+export function formatRating(raw: unknown): string {
+    const n = parseRating(raw);
+    return n == null ? '—' : `${n}/5`;
+}
+
+/**
  * Plain display text for an AI cell — the single source of truth shared by the
  * canvas grid mirror (AgenticGrid) and the CSV export (exportReview), so the two
  * never drift. Generating/pending/missing → '', null summary → '—', rating →
@@ -146,8 +163,7 @@ export function cellDisplayText(
     const value = cell.content?.summary ?? null;
     if (value == null) return '—';
     if (format === 'rating') {
-        const n = typeof value === 'number' ? value : Number.parseInt(String(value), 10);
-        return Number.isFinite(n) ? `${Math.max(0, Math.min(5, n))}/5` : '—';
+        return formatRating(value);
     }
     return valueToText(value);
 }

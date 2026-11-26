@@ -11,10 +11,13 @@ use App\Models\TabularReview;
 use App\Services\TabularReview\ReviewHydrator;
 use App\Support\TabularReview\CellStatus;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 class ColumnController extends Controller
 {
+    private const MAX_COLUMNS = 30;
+
     public function __construct(
         private readonly ReviewHydrator $hydrator,
     ) {}
@@ -24,16 +27,24 @@ class ColumnController extends Controller
      */
     public function store(ColumnRequest $request, int $id): JsonResponse
     {
-        $review = $this->findReview($id);
-        $columns = $this->columns($review);
+        return DB::transaction(function () use ($request, $id): JsonResponse {
+            $review = $this->findReview($id);
+            $columns = $this->columns($review);
 
-        $newIndex = count($columns);
-        $columns[] = $this->columnFromRequest($request, $newIndex);
+            if (count($columns) >= self::MAX_COLUMNS) {
+                return response()->json([
+                    'message' => 'Maximum number of columns ('.self::MAX_COLUMNS.') reached.',
+                ], 422);
+            }
 
-        $this->saveColumns($review, $columns);
-        // New column: no existing cells to clear.
+            $newIndex = count($columns);
+            $columns[] = $this->columnFromRequest($request, $newIndex);
 
-        return response()->json($this->hydrator->payload($review->fresh()), 201);
+            $this->saveColumns($review, $columns);
+            // New column: no existing cells to clear.
+
+            return response()->json($this->hydrator->payload($review->fresh()), 201);
+        });
     }
 
     /**
@@ -42,47 +53,67 @@ class ColumnController extends Controller
      */
     public function update(ColumnRequest $request, int $id, int $index): JsonResponse
     {
-        $review = $this->findReview($id);
-        $columns = $this->columns($review);
+        return DB::transaction(function () use ($request, $id, $index): JsonResponse {
+            $review = $this->findReview($id);
+            $columns = $this->columns($review);
 
-        if (! array_key_exists($index, $columns)) {
-            throw new NotFoundHttpException("Column [{$index}] not found.");
-        }
+            if (! array_key_exists($index, $columns)) {
+                throw new NotFoundHttpException("Column [{$index}] not found.");
+            }
 
-        $columns[$index] = $this->columnFromRequest($request, $index);
+            $columns[$index] = $this->columnFromRequest($request, $index);
 
-        $this->saveColumns($review, $columns);
-        $this->clearColumnCells($review, $index);
+            $this->saveColumns($review, $columns);
+            $this->clearColumnCells($review, $index);
 
-        return response()->json($this->hydrator->payload($review->fresh()));
+            return response()->json($this->hydrator->payload($review->fresh()));
+        });
     }
 
     /**
-     * Remove a column, reindex the remaining ones, and drop affected cells.
+     * Remove a column, reindex the remaining ones, and shift cells after the
+     * deleted column down by 1 without wiping unaffected columns.
      */
     public function destroy(int $id, int $index): JsonResponse
     {
-        $review = $this->findReview($id);
-        $columns = $this->columns($review);
+        return DB::transaction(function () use ($id, $index): JsonResponse {
+            $review = $this->findReview($id);
+            $columns = $this->columns($review);
 
-        if (! array_key_exists($index, $columns)) {
-            throw new NotFoundHttpException("Column [{$index}] not found.");
-        }
+            if (! array_key_exists($index, $columns)) {
+                throw new NotFoundHttpException("Column [{$index}] not found.");
+            }
 
-        // Removing a column shifts everything after it — simplest correct
-        // behaviour for the demo is to clear all cells and let the client
-        // regenerate, since column_index values renumber.
-        unset($columns[$index]);
-        $columns = array_values($columns);
-        foreach ($columns as $i => &$col) {
-            $col['index'] = $i;
-        }
-        unset($col);
+            unset($columns[$index]);
+            $columns = array_values($columns);
+            foreach ($columns as $i => &$col) {
+                $col['index'] = $i;
+            }
+            unset($col);
 
-        $this->saveColumns($review, $columns);
-        TabularCell::query()->where('review_id', $review->id)->delete();
+            $this->saveColumns($review, $columns);
 
-        return response()->json($this->hydrator->payload($review->fresh()));
+            // Delete only cells belonging to the removed column, then shift
+            // higher column_index cells down by 1 in ascending column_index
+            // order so UNIQUE(review_id, row_id, column_index) never collides.
+            TabularCell::query()
+                ->where('review_id', $review->id)
+                ->where('column_index', $index)
+                ->delete();
+
+            $cellsToShift = TabularCell::query()
+                ->where('review_id', $review->id)
+                ->where('column_index', '>', $index)
+                ->orderBy('column_index')
+                ->get();
+
+            foreach ($cellsToShift as $cell) {
+                $cell->column_index = $cell->column_index - 1;
+                $cell->save();
+            }
+
+            return response()->json($this->hydrator->payload($review->fresh()));
+        });
     }
 
     /**

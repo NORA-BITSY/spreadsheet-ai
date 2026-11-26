@@ -71,7 +71,6 @@ export function useAddColumn(
         },
         onSuccess: (review) => {
             qc.setQueryData<ReviewResponse>(queryKeys.review(preset), review);
-            void qc.invalidateQueries({ queryKey: queryKeys.review(preset) });
         },
     });
 }
@@ -107,9 +106,6 @@ export function useUpdateColumn(
         },
         onSuccess: (review) => {
             qc.setQueryData<ReviewResponse>(queryKeys.review(preset), review);
-        },
-        onSettled: () => {
-            void qc.invalidateQueries({ queryKey: queryKeys.review(preset) });
         },
     });
 }

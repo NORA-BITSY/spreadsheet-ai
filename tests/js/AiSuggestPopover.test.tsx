@@ -37,6 +37,23 @@ describe('AiSuggestPopover', () => {
         expect(screen.getByText(/Niente da suggerire/i)).toBeInTheDocument();
     });
 
+    it('shows an error alert with Retry button when isError is true', () => {
+        const onRetry = vi.fn();
+        render(
+            <AiSuggestPopover
+                open
+                suggestions={[]}
+                isError
+                onRetry={onRetry}
+                onPick={() => {}}
+                onClose={() => {}}
+            />,
+        );
+        expect(screen.getByRole('alert')).toHaveTextContent(/Impossibile caricare/i);
+        fireEvent.click(screen.getByRole('button', { name: /Retry/i }));
+        expect(onRetry).toHaveBeenCalledTimes(1);
+    });
+
     it('closes on veil click', () => {
         const onClose = vi.fn();
         const { container } = render(
