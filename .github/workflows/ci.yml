@@ -5,6 +5,9 @@ on:
   push:
     branches: [main, 'task/**']
 
+permissions:
+  contents: read
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -33,18 +36,32 @@ jobs:
           node-version: '22'
           cache: 'npm'
 
+      - name: Cache Composer packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.composer/cache
+            ~/.cache/composer
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-composer-
+
       - name: Composer install
         run: composer install --no-interaction --prefer-dist --no-progress
 
       - name: composer validate
         run: composer validate --strict
 
-      - name: Prepare app env (SQLite)
+      - name: composer audit
+        run: composer audit --no-interaction
+
+      - name: Pint code style check
+        run: vendor/bin/pint --test
+
+      - name: Prepare app env
         run: |
           cp .env.example .env
-          touch database/database.sqlite
           php artisan key:generate
-          php artisan migrate:fresh --seed --no-interaction
 
       - name: PHPUnit
         run: vendor/bin/phpunit
@@ -66,11 +83,22 @@ jobs:
       - name: Vite build
         run: npm run build
 
-      - name: Install Playwright (chromium)
-        run: npx playwright install --with-deps chromium
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
 
-      - name: Re-seed for a clean e2e baseline
-        run: php artisan migrate:fresh --seed --no-interaction
+      - name: Install Playwright (chromium)
+        run: |
+          if [ "${{ steps.playwright-cache.outputs.cache-hit }}" != "true" ]; then
+            npx playwright install --with-deps chromium
+          else
+            npx playwright install-deps chromium
+          fi
 
       - name: Playwright e2e
         run: npm run e2e
