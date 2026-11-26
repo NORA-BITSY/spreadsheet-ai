@@ -2,12 +2,10 @@
 
 Live "where am I" log. Newest first. Resume from the top after any interruption.
 
-## 2026-11-26 — M9 Production Readiness Hardening
-- Updated `README.md`: added GitHub `[!WARNING]` callout for unauthenticated demo API before exposing Live mode publicly, clarified server-controlled `TABULAR_AI_MOCK` behavior (read-only toolbar badge), documented `TABULAR_SSE_PACING_MS`, `TABULAR_RATE_LIMIT_API`, `TABULAR_RATE_LIMIT_STREAM`, added `npm run phpunit` note, and added a **Production Considerations & API Reference** section (synchronous SSE/Nginx caveats, SQLite WAL vs Postgres/MySQL, 6 `/api/*` endpoints).
-- Resolved factual drift across `AGENTS.md`, `CLAUDE.md`, `docs/RULES.md`, `docs/plan.md`, and `.claude/skills/spreadsheet-ai-plan/SKILL.md`: standardized model ID to `claude-haiku-4-5`, mock env var to `TABULAR_AI_MOCK=true`, PHP constraint to `^8.4`, removed contradicted `npx npm@10 ci --dry-run` instruction, marked external Windows `%USERPROFILE%\...` paths as historical/author-local, and updated completed M2/M7 items + `docs/plan.md` §5 status pointer.
-- Cleaned up `docs/PROGRESS.md` (removed unrelated LaTeX template entry, restored reverse-chronological order in the `2026-05-26` section) and `docs/LESSON.md` (added missing M4/M3/M2/M1 review section headings, marked superseded items clearly).
-- Cleaned up `.env.example`: set `APP_NAME="Spreadsheet-AI"`, added `TABULAR_RATE_LIMIT_API=120` and `TABULAR_RATE_LIMIT_STREAM=30`, and trimmed unused Laravel skeleton service blocks (`MEMCACHED_*`, `REDIS_*`, `AWS_*`, `VITE_APP_NAME`).
-
+## 2026-11-26 — M9 Production Readiness Hardening — COMPLETE, pushed to `main` @ `869f9c4`
+- `git push origin main` succeeded (local `task/m9-production-readiness` merged via `--no-ff`).
+- All gates green on `main`: composer validate --strict, composer audit 0, pint --test, PHPUnit 77/389, tsc 0, Vitest 134/134, Vite build 340 ms max chunk 317 kB (0 warnings), Playwright E2E 18/18.
+- Direct main push used (PR workflow unavailable remotely: `gh` OAuth token lacked `workflow` scope for `.github/workflows/ci.yml`; GitHub Actions billing-locked on this account).
 ## 2026-11-20 — Linux VM quickstart
 - Installed Composer 2.11.2 and PHP 8.4 for the checked-in lockfile; installed dependencies, generated `.env`/app key, and seeded SQLite. Local PHPUnit 65/341, Vitest 112/112, typecheck, build, and Playwright 17/17 pass.
 - Tailwind's automatic scan included unrelated project directories inside this checkout and tried to resolve their `banner.png` class. Scoped scanning to `resources/views` and `resources/js` with `source(none)`; production build now passes.

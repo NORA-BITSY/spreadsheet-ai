@@ -170,3 +170,31 @@ Rationale (user, 2026-05-26): catch issues locally first → cheaper iterations,
 
 ### Architecture decisions (locked)
 - SQLite, synchronous SSE (no Redis), Mock-default + Live toggle. Confirmed by user 2026-05-26. Rationale: zero-setup clonable demo.
+## 2026-11-26 — M9 production-readiness hardening (merged to `main` @ `869f9c4`)
+
+- **Backend hardening**:
+  - `StreamController::stream` returns `StreamedResponse|JsonResponse`: strict `?cols=` validation → HTTP 422 (non-digit, empty token, out-of-bounds index vs configured column count; deduplicated); `@set_time_limit(0)` inside the stream closure; `connection_aborted()` checks per row and per error-cell batch (`break 2`); emits `done` only when not aborted; row exceptions include provider `message` in the `cell` event + server-side `Log::warning`.
+  - `TabularAiClient::makeAgent($system)` returns a new `TabularAnonymousAgent` exposing `maxTokens()`/`temperature()`, so `TextGenerationOptions::forAgent()` forwards `tabular.max_tokens`/`tabular.temperature` instead of silently dropping them.
+  - `TabularReviewExtractor`: json_path & LLM-free routing via `isLlmFree() || ! empty($col['json_path'])`; missing `json_path` → red refusal; `summary` normalised via `normaliseSummary()` (booleans, scalars, arrays for bulleted_list/tags_multi, non-scalar via `stringifyValue` — no "Array to string conversion"); `buildUserPrompt($presetKey, $row)` wraps row data in `<untrusted_row_data>…</untrusted_row_data>`; `parseLlmResponse()` falls back to JSON-array / pretty-printed-object slicing via `extractTopLevelJsonObjects()`; prompt names/prompts JSON-encoded with `JSON_INVALID_UTF8_SUBSTITUTE`; `RowContextBuilder::contextJson()` caps at 32 KB (`MAX_CONTEXT_BYTES`) with truncation suffix.
+  - `ColumnController` store/update/destroy are `DB::transaction`-wrapped; 30-column cap; destroy deletes only the removed column's cells then shifts `column_index > index` down ascendingly (no `UNIQUE` collision); `ColumnRequest`: `enum_values` `nullable|array|min:1|max:50`, `enum_values.*` `required|string|max:120|not_regex:/^\s*$/`.
+  - `ReviewHydrator::payload()` exposes `ai_mode` (`mock`, `provider`, `model`) so the toolbar shows a read-only server badge instead of a client-side toggle; `findOrCreate()` catches `UniqueConstraintViolationException` → `firstOrFail()` (retry-safe under concurrent creates).
+  - `config/database.php`: SQLite `busy_timeout=5000`, `journal_mode=WAL`, `synchronous=NORMAL` via env defaults.
+  - `config/tabular.php` + `AppServiceProvider`: `tabular-api` / `tabular-stream` rate limiters (per-minute, IP-keyed; 1000/min in testing); `routes/api.php` groups all 6 endpoints under `throttle:tabular-api`, stream under `throttle:tabular-stream`.
+
+- **Frontend resilience**:
+  - `ActionBar`: Live/Mock toggle → read-only server `ai_mode` badge (`role="status"`, `data-mode`, title explaining `TABULAR_AI_MOCK` in `.env`).
+  - `useReview` mutations (`useAddColumn`, `useUpdateColumn`) no longer call `invalidateQueries` — cache seeded directly from returned payload (avoids structural-sharing regen bug); `useSseGeneration` snapshots cells before marking `generating` (single `batchSet`); `stop()` restores prior values / removes cells with no prior value; `onerror` transitions skeletons to `failed` and calls `onError` (toast in `TabularPage`).
+  - `CellStore`: `batchSet`/`batchRemove` (single Map clone + one subscriber notification).
+  - `csv.ts` `escapeCsvField`: `FORMULA_TRIGGER_RE = /^[\t\r\n]|^\s*[=+\-@]/` — catches leading whitespace before formula chars and leading newlines (bypass fix).
+  - Renderers hardened for non-scalar values (no `[object Object]`): `drawPerson`/`drawRelation`/`drawTagsMulti`/`drawBulletList` accept strings/objects/arrays; `drawRating`/`drawConfidenceTint` clamp NaN; `format.ts` added `parseRating()`/`formatRating()` (round+clamp to [0,5], `—` on invalid) shared by canvas, copyData, mirror, CSV.
+  - `theme.ts` resolves `--ai` via `getComputedStyle` for canvas `textHeader`; dead `GridPlaceholder.tsx` removed; Vite 8 Rolldown `codeSplitting` groups (glide, react-vendor, query-vendor, vendor) — max chunk 317 kB, 0 warnings.
+  - New `ErrorBoundary` wrapping `TabularPage` in `AppRoot.tsx`; `:focus-visible` styles; inline two-step delete confirmation + focus restoration in `ColumnEditor`; Retry UI on review error.
+
+- **Tests**: PHPUnit 77/389 (StreamTest rate-limit/422 cases; TabularAiClientTest asserting max_tokens/temperature forwarding; ConfigTest); Vitest 134 (useSseGeneration suite — stop/restore, onerror/failed, abort on reviewId switch & unmount; useReview optimistic rollback; renderers smoke across all 17 formats incl. malformed/NaN/null; cellStore batchSet/batchRemove; csv leading-whitespace/newline; format rating clamp; client non-JSON 500 / 204 / cross-origin rejection; ErrorBoundary; ColumnEditor inline delete confirm; ActionBar read-only badges).
+- **Repo hygiene**: scrubbed 10 leaked workspace entries from `.gitignore`; removed unrelated `templates/court-filing/`; `cloudflare/` Workers WIP parked on `task/m8-cloudflare-workers`; `.omo/` + empty `ollama/` removed.
+
+- **Gate results (all green locally)**: composer validate --strict, composer audit 0, pint --test, PHPUnit 77/389, tsc 0, Vitest 134/134, Vite build 340 ms max chunk 317 kB (0 warnings), Playwright E2E 18/18.
+
+- **Push note**: `git push origin main` succeeded; local `task/m9-production-readiness` merged via `--no-ff`. PR-based workflow (GitHub Copilot review + Actions CI) could not complete remotely: the `gh` OAuth token lacked `workflow` scope (needed for `.github/workflows/ci.yml`) and GitHub Actions is billing-locked on this account. Direct main push used instead after full local gate verification.
+
+- **Architecture decisions (locked, unchanged)**: SQLite · synchronous SSE (no Redis) · Mock-default + Live mode via `.env` (server-controlled, read-only toolbar badge).
